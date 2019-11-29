@@ -1,13 +1,14 @@
 from __future__ import absolute_import, print_function
 from flask import Flask, request, jsonify, Response
-from transformer_hf import inference
+#from transformer_hf import inference
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
-def complete(ret_string, size, search):
-    out = inference(phrase=ret_string, top_k=10, length=10)
+def complete(ret_string, size=None, search=None):
+    #out = inference(phrase=ret_string, top_k=10, length=10)
+    out = ret_string[::-1]
     ret = {'completion': out}
     return ret
 
@@ -25,4 +26,8 @@ def predict():
     #return jsonify(resp)
 
 if __name__ == '__main__':
-    app.run(port=4200, debug=True)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--port', '-p', default=4200)
+    args = parser.parse_args()
+    app.run(port=args, debug=True)
