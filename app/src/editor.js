@@ -64,6 +64,7 @@ export default class myEditor extends React.Component {
 
   async getCompletion(context) {
     var t0 = now();
+	console.log(this.props.getConfig());
     const data = {'context': context,
                   'config': this.props.getConfig(),
 	};
