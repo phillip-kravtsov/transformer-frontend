@@ -1,10 +1,6 @@
 import torch
-from transformers import *
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import torch.nn.functional as F
-#from run_generation import top_k_top_p_filtering
-#from run_generation import sample_sequence
-
-#print(inference(model=model,enc=tokenizer,phrase='Once upon a', length=5))
 '''
 Method
 def inference(phrase, top_k, top_p, length):
@@ -17,24 +13,14 @@ def inference(phrase, top_k, top_p, length):
 # Load pre-trained model tokenizer (vocabulary)
 tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
-# Encode a text inputs
-#text = "Happy Birthday to"
-#indexed_tokens = tokenizer.encode(text)
-
-# Convert indexed tokens in a PyTorch tensor
-#tokens_tensor = torch.tensor([indexed_tokens])
-
 # Load pre-trained model (weights)
 model = GPT2LMHeadModel.from_pretrained('gpt2')
 
 # Set the model in evaluation mode to deactivate the DropOut modules
 model.eval()
 
-# If you have a GPU, put everything on cuda
-#CUDA - Compute Unified Device Architecture
-#.to() - Sets dtype or device to a tensor
-#tokens_tensor = tokens_tensor.to('cpu')
-model.to('cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 
 # Predict all tokens
 #with torch.no_grad():
@@ -68,7 +54,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
         cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
 
         # Remove tokens with cumulative probability above the threshold
-        sorted_indices_to_remove = torch.tensor(cumulative_probs >= top_p, dtype=torch.uint8)
+        sorted_indices_to_remove = torch.tensor(cumulative_probs >= top_p, dtype=torch.uint8).to(device)
         #print(sorted_indices_to_remove.shape)
         # Shift the indices to the right to keep also the first token above the threshold
         sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
@@ -81,7 +67,6 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 def inference(model = model, enc = tokenizer, phrase= '', top_k = 1, top_p = 0.9, length = 1):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     nsamples = 1
     length = length
     temperature = 1.2
@@ -136,3 +121,31 @@ def sample_sequence(model, length, start_token=None, batch_size=None, context=No
                 break
     return output
 
+def search(phrase, top_p, top_k, timeout, enc=tokenizer, model=model):
+
+    stop_token = [enc.encoder[x] for x in ('<|endoftext|>', '.', '?', '!')]
+    context_tokens = enc.encode(phrase) if phrase else [enc.encoder['<|endoftext|>']]
+    context = torch.tensor(context_tokens, device=device, dtype=torch.long).unsqueeze(0).repeat(batch_size, 1)
+    prev = context
+    output = context
+    past = None
+
+    entropies = []
+    start_time = time.time()
+    with torch.no_grad():
+        while time.time() < start_time + timeout :
+            logits, past = model(prev, past=past)
+            logits = logits[:, -1, :] / temperature
+            probs_full = F.softmax(logits, dim=-1)
+            entropy = torch.distributions.Categorical(probs=probs_full).entropy()
+            entropies.append(entropy.item())
+            logits = top_k_top_p_filtering(logits, top_p=top_p, top_k=top_k)
+            probs = F.softmax(logits, dim=-1)
+            prev = torch.multinomial(probs, num_samples=1)
+            output = torch.cat((output, prev), dim=1)
+            if prev in stop_token:
+                break
+    out = output[:, len(context_tokens):].tolist()
+    return {
+        'out': enc.decode(out[0])
+    }
