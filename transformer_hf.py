@@ -1,6 +1,7 @@
 import torch
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import torch.nn.functional as F
+import time
 '''
 Method
 def inference(phrase, top_k, top_p, length):
@@ -121,8 +122,9 @@ def sample_sequence(model, length, start_token=None, batch_size=None, context=No
                 break
     return output
 
-def search(phrase, top_p, top_k, timeout, enc=tokenizer, model=model):
-
+def search(phrase, top_p, top_k, timeout, temperature, enc=tokenizer, model=model):
+ 
+    batch_size = 1
     stop_token = [enc.encoder[x] for x in ('<|endoftext|>', '.', '?', '!')]
     context_tokens = enc.encode(phrase) if phrase else [enc.encoder['<|endoftext|>']]
     context = torch.tensor(context_tokens, device=device, dtype=torch.long).unsqueeze(0).repeat(batch_size, 1)

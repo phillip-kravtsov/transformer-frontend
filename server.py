@@ -1,27 +1,28 @@
 from __future__ import absolute_import, print_function
 from flask import Flask, request, jsonify, Response
-#from transformer_hf import inference
+from transformer_hf import search
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
-def complete(ret_string, size=None, search=None):
-    #out = inference(phrase=ret_string, top_k=10, length=10)
-    out = ret_string[::-1]
-    ret = {'completion': out}
-    return ret
+def complete(context, config):
+    out = search(phrase=context,
+                 top_k=config['top_k'],
+                 top_p=config['top_p'],
+                 timeout=config['timeout'],
+                 temperature=config['temperature'])
+#    out = context[::-1]
+    return {'completion': out}
 
 @app.route('/predict', methods=['POST', ])
 def predict():
     data = request.get_json(force=True)
     app.logger.warning(data)
-    try:
-        prediction = complete(data['x'], data['size'], data['search'])
-    except KeyError:
-        prediction = complete(data['x'])
-    app.logger.warning(prediction)
-    jp = jsonify(prediction)
+    comp = complete(data['context'], data['config']) 
+    completion = comp['completion']
+    app.logger.warning(completion)
+    jp = jsonify(completion)
     app.logger.warning(jp)
     return jp, 200
     #resp = Response(jp)
@@ -33,4 +34,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', '-p', type=int, default=4200)
     args = parser.parse_args()
-    app.run(host='0.0.0.0', port=args.port, debug=True)
+    app.run(port=args.port, debug=True)
+    #app.run(host='0.0.0.0', port=args.port, debug=True)
