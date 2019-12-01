@@ -8,10 +8,11 @@ CORS(app)
 
 def complete(context, config):
     out_dict = search(phrase=context,
-                 top_k=config['top_k'],
-                 top_p=config['top_p'],
-                 timeout=config['timeout'],
-                 temperature=config['temperature'])
+                      top_k=config['top_k'],
+                      top_p=config['top_p'],
+                      timeout=config['timeout'],
+                      temperature=config['temperature'],
+                      length=config['length'],)
 #    out = context[::-1]
     return out_dict
 
