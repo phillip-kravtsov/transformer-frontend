@@ -7,22 +7,21 @@ app = Flask(__name__)
 CORS(app)
 
 def complete(context, config):
-    out = search(phrase=context,
+    out_dict = search(phrase=context,
                  top_k=config['top_k'],
                  top_p=config['top_p'],
                  timeout=config['timeout'],
                  temperature=config['temperature'])
 #    out = context[::-1]
-    return {'completion': out}
+    return out_dict
 
 @app.route('/predict', methods=['POST', ])
 def predict():
     data = request.get_json(force=True)
     app.logger.warning(data)
     comp = complete(data['context'], data['config']) 
-    completion = comp['completion']
-    app.logger.warning(completion)
-    jp = jsonify(completion)
+    app.logger.warning(comp['completion'])
+    jp = jsonify(comp)
     app.logger.warning(jp)
     return jp, 200
     #resp = Response(jp)

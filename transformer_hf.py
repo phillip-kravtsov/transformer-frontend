@@ -149,5 +149,5 @@ def search(phrase, top_p, top_k, timeout, temperature, enc=tokenizer, model=mode
                 break
     out = output[:, len(context_tokens):].tolist()
     return {
-        'out': enc.decode(out[0])
+        'completion': enc.decode(out[0])
     }
