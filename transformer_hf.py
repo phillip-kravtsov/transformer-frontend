@@ -122,7 +122,7 @@ def sample_sequence(model, length, start_token=None, batch_size=None, context=No
                 break
     return output
 
-def search(phrase, top_p, top_k, timeout, temperature, enc=tokenizer, model=model):
+def search(phrase, top_p, top_k, timeout, temperature, length, enc=tokenizer, model=model):
  
     batch_size = 1
     stop_token = [enc.encoder[x] for x in ('<|endoftext|>', '.', '?', '!')]
@@ -134,8 +134,9 @@ def search(phrase, top_p, top_k, timeout, temperature, enc=tokenizer, model=mode
 
     entropies = []
     start_time = time.time()
+    count = 0
     with torch.no_grad():
-        while time.time() < start_time + timeout :
+        while time.time() < start_time + timeout and count <= length:
             logits, past = model(prev, past=past)
             logits = logits[:, -1, :] / temperature
             probs_full = F.softmax(logits, dim=-1)
@@ -147,6 +148,7 @@ def search(phrase, top_p, top_k, timeout, temperature, enc=tokenizer, model=mode
             output = torch.cat((output, prev), dim=1)
             if prev in stop_token:
                 break
+            count += 1
     out = output[:, len(context_tokens):].tolist()
     return {
         'completion': enc.decode(out[0])
