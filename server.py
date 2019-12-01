@@ -16,7 +16,10 @@ def complete(ret_string, size=None, search=None):
 def predict():
     data = request.get_json(force=True)
     app.logger.warning(data)
-    prediction = complete(data['x'], data['size'], data['search'])
+    try:
+        prediction = complete(data['x'], data['size'], data['search'])
+    except KeyError:
+        prediction = complete(data['x'])
     app.logger.warning(prediction)
     jp = jsonify(prediction)
     app.logger.warning(jp)
@@ -30,4 +33,4 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', '-p', type=int, default=4200)
     args = parser.parse_args()
-    app.run(port=args.port, debug=True)
+    app.run(host='0.0.0.0', port=args.port, debug=True)
