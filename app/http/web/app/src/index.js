@@ -1,5 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import now from 'performance-now';
+import MyEditor from './editor.js';
 import { makeStyles} from '@material-ui/core/styles';
 import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
@@ -78,7 +80,7 @@ function FiddleGroup(props) {
 	  <Grid item>
 		<Fiddle handleChange={props.hcsearch} options={['Beam Search', 'Random Sampling']} label='Search Method'/>
 	  </Grid>
-	  <Grid idtem>
+	  <Grid item>
 		<Fiddle handleChange={props.hcsize} options={['1.5B', '774M', '345M' ]} label='Model Size'/>
 	  </Grid>
 	</Grid>
@@ -130,12 +132,22 @@ class PromptAndResponse extends React.Component {
 
   async onClick() {
 	
-	const data = {'x': this.state.value,
-				  'size': this.state.size,
-				  'search': this.state.search,}
-	const resp = await postData('http://localhost:4200/predict', data); //Calls postData above
-	const comp = resp['completion']
-	console.log(comp)
+    var t0 = now();
+	const data = {'context': this.state.value,
+                  'config': {
+                    'size': this.state.size,
+                    'search': this.state.search,
+                    'top_k': 100,
+                    'top_p': 1.0,
+                    'temperature': 1.2,
+                    'timeout': 2.0,
+                  }};
+	const resp = await postData('http://ec2-13-56-76-187.us-west-1.compute.amazonaws.com:4200/predict', data); //Calls postData above
+    //const resp = await postData('http://127.0.0.1:4200/predict', data);
+	const comp = resp['completion'];
+    var t1 = now();
+    console.log(t1-t0);
+	console.log(comp);
 	this.setState({'value': this.state.value.concat(comp)});
 	console.log(resp);
   };
@@ -208,7 +220,10 @@ function App() {
 		<Grid item>
 		  <PromptAndResponse classes={classes} />
 		</Grid>
-	  </Grid>
+       </Grid>
+	   <Grid item>
+		 <MyEditor />
+	   </Grid>
 	</Grid>
     );
 }
