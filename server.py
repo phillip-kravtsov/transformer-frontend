@@ -32,6 +32,9 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', '-p', type=int, default=4200)
+    parser.add_argument('--prod', '-o', action='store_true')
     args = parser.parse_args()
-    app.run(port=args.port, debug=True)
-    #app.run(host='0.0.0.0', port=args.port, debug=True)
+    if args.prod:
+        app.run(host='0.0.0.0', port=args.port, debug=True)
+    else:
+        app.run(port=args.port, debug=True)

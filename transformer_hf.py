@@ -55,14 +55,14 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
         cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
 
         # Remove tokens with cumulative probability above the threshold
-        sorted_indices_to_remove = torch.tensor(cumulative_probs >= top_p, dtype=torch.uint8).to(device)
+        sorted_indices_to_remove = torch.tensor(cumulative_probs >= top_p, dtype=torch.bool).to(device)
         #print(sorted_indices_to_remove.shape)
         # Shift the indices to the right to keep also the first token above the threshold
         sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
         sorted_indices_to_remove[..., 0] = 0
         
         #Zeros_like - creates tensor with zeros same length as input
-        indices_to_remove = torch.zeros_like(logits, dtype=torch.uint8).scatter_(dim=-1, index=sorted_indices, src=sorted_indices_to_remove)
+        indices_to_remove = torch.zeros_like(logits, dtype=torch.bool).scatter_(dim=-1, index=sorted_indices, src=sorted_indices_to_remove)
         #indices_to_remove = sorted_indices[sorted_indices_to_remove]
         logits[indices_to_remove] = filter_value
     return logits
