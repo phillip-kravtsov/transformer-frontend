@@ -1,0 +1,7 @@
+*.swp
+*.js.swp
+*.swo
+*.pyc
+__pycache__
+app/node_modules
+
