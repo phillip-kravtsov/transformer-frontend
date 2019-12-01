@@ -24,9 +24,6 @@ def predict():
     jp = jsonify(comp)
     app.logger.warning(jp)
     return jp, 200
-    #resp = Response(jp)
-    #resp.headers['Access-Control-Allow-Origin'] = '*'
-    #return jsonify(resp)
 
 if __name__ == '__main__':
     import argparse
