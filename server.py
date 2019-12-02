@@ -15,10 +15,6 @@ def complete(context, config):
                       length=config['length'],
                       batch_size=8,
                       logger=app.logger)
-    if context:
-        likelihood = get_log_likelihood(context, logger=app.logger)
-        app.logger.warning(likelihood)
-
     app.logger.warning(sum(out_dict["times"])/len(out_dict['times']))
     return out_dict
 
@@ -26,9 +22,9 @@ def complete(context, config):
 def prob():
     data = request.get_json(force=True)
     app.logger.debug(data)
-    likelihood = get_log_likelihood(data['phrase'], context=data['context'], logger=app.logger)
-    app.logger.warning(likelihood)
-    return {'log_likelihood': log_likelihood}
+    log_likelihood = get_log_likelihood(phrase=data['phrase'], context=data['context'], logger=app.logger)
+    app.logger.warning(log_likelihood)
+    return jsonify({'log_likelihood': log_likelihood}), 200
 
 @app.route('/predict', methods=['POST', ])
 def predict():
