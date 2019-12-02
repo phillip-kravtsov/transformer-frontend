@@ -15,9 +15,10 @@ def complete(context, config):
                       length=config['length'],
                       batch_size=8,
                       logger=app.logger)
-    likelihood = get_log_likelihood(context, context=None, logger=app.logger)
-    app.logger.warning(likelihood)
-    app.logger.warning(out_dict["times"])
+    if context:
+        likelihood = get_log_likelihood(context, logger=app.logger)
+        app.logger.warning(likelihood)
+
     app.logger.warning(sum(out_dict["times"])/len(out_dict['times']))
     return out_dict
 

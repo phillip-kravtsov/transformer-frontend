@@ -13,10 +13,10 @@ def inference(phrase, top_k, top_p, length):
 '''
 
 # Load pre-trained model tokenizer (vocabulary)
-tokenizer = GPT2Tokenizer.from_pretrained('gpt2-large')
+tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = GPT2LMHeadModel.from_pretrained('gpt2-large')
+model = GPT2LMHeadModel.from_pretrained('gpt2')
 model.eval()
 model.half()
 model.to(device)
@@ -52,25 +52,24 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
         logits[indices_to_remove] = filter_value
     return logits
 
-def get_log_likelihood(phrase, context=None, enc=tokenizer, model=model, logger=None):
+def get_log_likelihood(phrase, context='', enc=tokenizer, model=model, logger=None):
     assert len(phrase) > 0, 'nonempty phrase needed'
-    if context is not None:
-        phrase = context + phrase 
-        
-    logger.warning(phrase)
-    encoded_phrase = enc.encode(phrase) if phrase else [enc.encoder['<|endoftext|>']]
-    prev = torch.tensor(encoded_phrase, device=device, dtype=torch.long).unsqueeze(0).repeat(1,1)
-    logger.warning(prev.shape)
-    shape = prev.shape[1]
-    past = None
+    tokens = enc.encode(phrase) if phrase else [enc.encoder['<|endoftext|>']]
+    len_phrase_tokens = len(tokens)
+    context_tokens = enc.encode(context) if context else []
+    tokens.extend(context_tokens)
+
+    logger.warning(tokens)
+    if len(tokens) > 1024:
+        tokens = tokens[:-1024]
+    prev = torch.tensor(tokens, device=device, dtype=torch.long).unsqueeze(0).repeat(1,1)
     
     log_likelihood = 0.0
     with torch.no_grad():
-        for i in range(1, shape):
-            logits, past = model(prev[:, :i], past=past)
-            probs_full = F.softmax(logits, dim=-1)
-            logger.warning(probs_full.shape)
-            prob_of_next_token = probs_full[0, 0, encoded_phrase[i]]
+        logits, past = model(prev, past=None)
+        probs_full = F.softmax(logits, dim=-1)
+        for i in range(len(context_tokens) + 1, len_phrase_tokens):
+            prob_of_next_token = probs_full[0, i, tokens[i]]
             log_likelihood += np.log(prob_of_next_token.item())
     return log_likelihood
 
