@@ -12,6 +12,7 @@ config = {
     'top_p': 1,
     'temperature': 1.2,
     'timeout': 2.0,
+    'length': 4,
 }
 url = '{}:{}/predict'.format(args.url, args.port)
 r = requests.post(url, json={'context': "absolute-import",

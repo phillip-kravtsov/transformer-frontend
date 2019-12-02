@@ -2,7 +2,8 @@ import React from 'react';
 import {OrderedSet} from 'immutable';
 import now from 'performance-now';
 import {Editor, EditorState, getDefaultKeyBinding, Modifier, SelectionState} from 'draft-js';
-import Autosuggest from 'react-autosuggest';
+import Button from '@material-ui/core/Button'
+import Typography from '@material-ui/core/Typography'
 import './Draft.css'
 
 const styles = {
@@ -14,12 +15,6 @@ const styles = {
   }
 };
 
-function keyBindingFn(e) {
-  if (e.key === 'Tab') {
-	return 'complete'
-  }
-  return getDefaultKeyBinding(e);
-}
 
 async function postData(url = '', data = {}) {
   const response = await fetch(url, {
@@ -36,17 +31,15 @@ async function postData(url = '', data = {}) {
   return content;
 }
 
-function myBlockRenderer(contentBlock) {
-  const type = contentBlock.getType();
-}
-
 export default class myEditor extends React.Component {
   constructor(props) {
     super(props);
     this.state = {editorState:EditorState.createEmpty(),
 				  lastCompletionSelection: false,
+				  await_lock: false,
+				  log_likelihood: 0,
 	};
-    this.onChange = (editorState) => this.setState({editorState});
+
     this.setEditor = (editor) => {
       this.editor = editor;
     };
@@ -56,7 +49,94 @@ export default class myEditor extends React.Component {
       }
     };
 	this.handleKeyCommand = this.handleKeyCommand.bind(this);
+	this.onChange = this.onChange.bind(this);
+	this.keyBindingFn = this.keyBindingFn.bind(this);
+	this.cleanLastSelection = this.cleanLastSelection.bind(this);
+	this.selectLastSelection = this.selectLastSelection.bind(this);
+	this.onClick = this.onClick.bind(this);
   };
+
+  onChange(editorState) {
+	this.setState({editorState});
+  }
+
+  async onClick() {
+	const phrase = this.getSelectionText(this.state.editorState);
+	const currSelection = this.state.editorState.getSelection();
+	let data;
+	if (currSelection.isCollapsed()) {
+	   data = {'phrase': phrase, 'context': ''};
+	} else {
+	  const blockMap = this.state.editorState.getCurrentContent().getBlockMap();
+	  const endKey = currSelection.getStartKey();
+	  
+	  var context = ''
+	  for (let keyblock of blockMap) {
+		const key = keyblock[0];
+		const block = keyblock[1];
+		let text = block.getText();
+		if (key === endKey) {
+		  context = context.concat(text.substring(0, currSelection.getStartOffset()));
+		  break;
+		}
+		context = context.concat(text).concat('\n');
+	  }
+	  data = {'phrase': phrase, 'context': context}
+	}
+	console.log(data);
+    const resp = await postData('http://ec2-18-144-35-237.us-west-1.compute.amazonaws.com:4200/prob', data); //Calls postData above
+	console.log(resp);
+	this.setState({'log_likelihood': resp['log_likelihood']})
+  }
+
+  keyBindingFn(e) {
+	if (e.key === 'Tab') {
+	  return 'complete'
+	}
+	const inp = String.fromCharCode(e.keyCode);
+	if (/[a-zA-Z0-9-_ ]/.test(inp) || e.key === 'Enter' || e.keyCode === 8) {
+	  this.cleanLastSelection();	
+	  console.log('alphanumeric');
+	}
+	return getDefaultKeyBinding(e);
+  }
+
+  cleanLastSelection() {
+	if (!(this.state.lastCompletionSelection === false)) {
+	  const currContent = this.state.editorState.getCurrentContent();
+	  const ncs = Modifier.replaceText(currContent, this.state.lastCompletionSelection, '');
+	  let nextEditorState = EditorState.push(
+		  this.state.editorState,
+		  ncs,
+		  'remove-range'
+	  );
+	  this.onChange(nextEditorState);
+	  this.setState({'lastCompletionSelection': false});
+	}
+
+  }
+
+  selectLastSelection(editorState) {
+	const endKey = this.state.lastCompletionSelection.getEndKey();
+	const emptySelection = SelectionState.createEmpty(endKey);
+	const offset = this.state.lastCompletionSelection.getEndOffset();
+	const endSelection = emptySelection.merge({
+	  focusKey: endKey,
+	  anchorOffset: offset,
+	  focusOffset: offset,
+	  hasFocus: true,
+	});
+	const cs = editorState.getCurrentContent();
+	console.log(this.state.lastCompletionSelection);
+	if (!(this.state.lastCompletionSelection === false)) {
+	  const ncs = Modifier.removeInlineStyle(cs, this.state.lastCompletionSelection, 'BOLD');
+	  let nextEditorState = EditorState.push(editorState, ncs, 'change-inline-style');
+	  nextEditorState = EditorState.forceSelection(nextEditorState, endSelection);
+	  this.onChange(nextEditorState);
+	}
+	this.setState({'lastCompletionSelection': false});
+	return;
+  }
  
   updateStateWithCompletion(completion, contentState) {
 	const currSelection = this.state.editorState.getSelection();
@@ -90,38 +170,76 @@ export default class myEditor extends React.Component {
     const resp = await postData('http://ec2-18-144-35-237.us-west-1.compute.amazonaws.com:4200/predict', data); //Calls postData above
     //const resp = await postData('http://127.0.0.1:4200/predict', data);
     const comp = resp['completion'];
+	console.log(resp['all_completions']);
     var t1 = now();
     console.log(t1-t0);
     console.log(comp);
 	return comp;
   }	
+  
+  getSelectionText(editorState) {
+	const contentState = editorState.getCurrentContent();
+	const selection = editorState.getSelection();
+	var startKey;
+	if (selection.isCollapsed()) {
+	  startKey = contentState.getFirstBlock().getKey();
+	} else {
+	  startKey = selection.getStartKey();
+	}
+	const endKey = selection.getEndKey();
+	if (startKey === endKey && !selection.isCollapsed()) {
+	  const block = contentState.getBlockForKey(startKey);
+	  return block.getText().substring(selection.getStartOffset(), selection.getEndOffset());
+	}
+	// Note: the code below only works if startKey and endKey are different, that is
+	// if the selection spans across blocks. The other case is handled above.
 
-  async handleKeyCommand(command) {
+	console.log(startKey);
+	console.log(endKey);
+
+	let context = "";
+	let encounteredFirst = false;
+	const blockMap = contentState.getBlockMap();
+	
+	for (let keyblock of blockMap) {
+	  const key = keyblock[0];
+	  const block = keyblock[1];
+	  let text = block.getText();
+	  if (!encounteredFirst) {
+		if (key === startKey) {
+		  encounteredFirst = true;
+		  if (!selection.isCollapsed()) {
+			text = text.substring(selection.getStartOffset())
+		  }
+		} else {
+		  continue;
+		}
+	  }
+	  if (key === endKey) {
+		context = context.concat(text.substring(0, selection.getEndOffset()));
+		break;
+	  }
+	  context = context.concat(text).concat('\n');
+	}
+	return context
+  }
+
+  async handleKeyCommand(command, editorState) {
 	if (command === 'complete') {
-	  // Do the thing here
-	  const contentState = this.state.editorState.getCurrentContent();
-	  if (!(this.state.lastCompletionSelection === false)) {
-		console.log("No falsehoods here");
-		console.log(this.state.lastCompletionSelection);
-		const endKey = this.state.lastCompletionSelection.getEndKey();
-		const emptySelection = SelectionState.createEmpty(endKey);
-		const offset = this.state.lastCompletionSelection.getEndOffset();
-		const endSelection = emptySelection.merge({
-		  focusKey: endKey,
-		  anchorOffset: offset,
-		  focusOffset: offset,
-		  hasFocus: true,
-		});
-		const ncs = Modifier.removeInlineStyle(contentState, this.state.lastCompletionSelection, 'BOLD');
-		var nextEditorState = EditorState.push(this.state.editorState, ncs, 'change-inline-style');
-		nextEditorState = EditorState.forceSelection(nextEditorState, endSelection);
-		this.onChange(nextEditorState);
-		this.setState({'lastCompletionSelection': false});
+	  if (this.state.await_lock === true) {
+		console.log('Locked!');
 		return;
 	  }
-	  const context = contentState.getPlainText('\n');
+	  const contentState = editorState.getCurrentContent();
+	  if (!(this.state.lastCompletionSelection === false)) {
+		this.selectLastSelection(editorState);
+		return;
+	  }
+	  const context = this.getSelectionText(editorState);
 	  console.log(context);
+	  this.setState({'await_lock': true});
 	  const completion = await this.getCompletion(context);
+	  this.setState({'await_lock': false});
 	  console.log(completion)
 	  this.updateStateWithCompletion(completion, contentState);
 	  return 'handled';
@@ -140,14 +258,24 @@ export default class myEditor extends React.Component {
   }
   render() {
     return (
-	  <div style={styles.editor} onClick={this.focusEditor}>
-		<Editor placeholder="Enter something, and hit tab to get a neural network's predictions"
-				ref={this.setEditor}
-				customStyleMap={this.styleMap}
-				editorState={this.state.editorState}
-				handleKeyCommand={this.handleKeyCommand}
-				keyBindingFn={keyBindingFn}
-				onChange={this.onChange} />
+	  <div>
+		<div style={styles.editor} onClick={this.focusEditor}>
+		  <Editor placeholder="Enter something, and hit tab to get a neural network's predictions. Control the context by selecting a region."
+				  ref={this.setEditor}
+				  customStyleMap={this.styleMap}
+				  editorState={this.state.editorState}
+				  handleKeyCommand={this.handleKeyCommand}
+				  keyBindingFn={this.keyBindingFn}
+				  onChange={this.onChange} />
+		</div>
+		<div>
+		  <Button onClick={this.onClick}>
+			Probabilty 
+		  </Button>
+		  <Typography variant="h5">
+			{this.state.log_likelihood}
+		  </Typography>
+		</div>
 	  </div>
     );
   };

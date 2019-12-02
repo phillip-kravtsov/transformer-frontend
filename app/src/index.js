@@ -104,7 +104,7 @@ class PromptAndResponse extends React.Component {
 			'top_p': this.state.topp,
 			'temperature': this.state.temperature,
 			'timeout': this.state.timeout,
-			'length': 10,};
+			'length': 100,};
     }
 
   render() {

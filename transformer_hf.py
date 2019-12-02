@@ -71,8 +71,7 @@ def get_log_likelihood(phrase, context='', enc=tokenizer, model=model, logger=No
         for i in range(len(context_tokens) + 1, len_phrase_tokens):
             prob_of_next_token = probs_full[0, i, tokens[i]]
             log_likelihood += np.log(prob_of_next_token.item())
-    return log_likelihood
-
+    return float(log_likelihood)
 
 def filter_predictions(predictions, entropies=None):
     out = []
