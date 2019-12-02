@@ -1,6 +1,6 @@
 from __future__ import absolute_import, print_function
 from flask import Flask, request, jsonify, Response
-from transformer_hf import search
+from transformer_hf import search, get_log_likelihood
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -13,8 +13,12 @@ def complete(context, config):
                       timeout=config['timeout'],
                       temperature=config['temperature'],
                       length=config['length'],
-                      batch_size=8,)
-#    out = context[::-1]
+                      batch_size=8,
+                      logger=app.logger)
+    likelihood = get_log_likelihood(context, context=None, logger=app.logger)
+    app.logger.warning(likelihood)
+    app.logger.warning(out_dict["times"])
+    app.logger.warning(sum(out_dict["times"])/len(out_dict['times']))
     return out_dict
 
 @app.route('/predict', methods=['POST', ])

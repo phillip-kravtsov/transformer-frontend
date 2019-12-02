@@ -1,5 +1,6 @@
 import torch
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
+import numpy as np
 import torch.nn.functional as F
 import time
 '''
@@ -12,29 +13,13 @@ def inference(phrase, top_k, top_p, length):
 '''
 
 # Load pre-trained model tokenizer (vocabulary)
-tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-
-# Load pre-trained model (weights)
-model = GPT2LMHeadModel.from_pretrained('gpt2')
-
-# Set the model in evaluation mode to deactivate the DropOut modules
-model.eval()
+tokenizer = GPT2Tokenizer.from_pretrained('gpt2-large')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = GPT2LMHeadModel.from_pretrained('gpt2-large')
+model.eval()
+model.half()
 model.to(device)
-
-# Predict all tokens
-#with torch.no_grad():
-    #outputs = model(tokens_tensor)
-    #filter_outputs = top_k_top_p_filtering(logits=outputs, top_k=10, top_p=0.5)
-    #predictions = outputs[0]
-
-# Get the predicted next sub-word
-#predicted_index = torch.argmax(predictions[0, -1, :]).item()
-#predicted_text = tokenizer.decode(indexed_tokens + [predicted_index])
-
-# Print the predicted word
-#print(predicted_text)
 
 def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
     """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
@@ -67,60 +52,28 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
         logits[indices_to_remove] = filter_value
     return logits
 
-def inference(model = model, enc = tokenizer, phrase= '', top_k = 1, top_p = 0.9, length = 1, batch_size=1):
-    nsamples = 1
-    length = length
-    temperature = 1.2
-    top_k = top_k
-    top_p = top_p
-    batch_size = 1
-    stop_token = [enc.encoder[x] for x in ('<|endoftext|>', '.', '?', '!')]
-    assert nsamples % batch_size == 0
-
-    if length == -1:
-        length = model.config.n_ctx // 2
-    elif length > model.config.n_ctx:
-        raise ValueError("Can't get samples longer than window size: %s" % model.config.n_ctx)
-
-    context_tokens = enc.encode(phrase) if phrase else [enc.encoder['<|endoftext|>']]
-    generated = 0
-    out = sample_sequence(
-        model=model, length=length,
-        context=context_tokens,
-        start_token=None,
-        batch_size=batch_size,
-        temperature=temperature, top_k=top_k, device=device,
-        top_p=top_p,
-        stop_token=[]#stop_token
-    )
-    out = out[:, len(context_tokens):].tolist()
-    return enc.decode(out[0])
-
-def sample_sequence(model, length, start_token=None, batch_size=None, context=None, temperature=1, top_k=0,
-                    device='cuda', top_p=0, stop_token=[]):
-    if start_token is None:
-        assert context is not None, 'Specify exactly one of start_token and context!'
-        context = torch.tensor(context, device=device, dtype=torch.long).unsqueeze(0).repeat(batch_size, 1)
-    else:
-        assert context is None, 'Specify exactly one of start_token and context!'
-        context = torch.full((batch_size, 1), start_token, device=device, dtype=torch.long)
-    prev = context
-    output = context
+def get_log_likelihood(phrase, context=None, enc=tokenizer, model=model, logger=None):
+    assert len(phrase) > 0, 'nonempty phrase needed'
+    if context is not None:
+        phrase = context + phrase 
+        
+    logger.warning(phrase)
+    encoded_phrase = enc.encode(phrase) if phrase else [enc.encoder['<|endoftext|>']]
+    prev = torch.tensor(encoded_phrase, device=device, dtype=torch.long).unsqueeze(0).repeat(1,1)
+    logger.warning(prev.shape)
+    shape = prev.shape[1]
     past = None
-
-    count = 0
+    
+    log_likelihood = 0.0
     with torch.no_grad():
-        while count < length:
-            logits, past = model(prev, past=past)
-            logits = logits[:, -1, :] / temperature
-            logits = top_k_top_p_filtering(logits, top_p=top_p, top_k=top_k)
-            probs = F.softmax(logits, dim=-1)
-            prev = torch.multinomial(probs, num_samples=1)
-            output = torch.cat((output, prev), dim=1)
-            count += 1
-            if prev in stop_token:
-                break
-    return output
+        for i in range(1, shape):
+            logits, past = model(prev[:, :i], past=past)
+            probs_full = F.softmax(logits, dim=-1)
+            logger.warning(probs_full.shape)
+            prob_of_next_token = probs_full[0, 0, encoded_phrase[i]]
+            log_likelihood += np.log(prob_of_next_token.item())
+    return log_likelihood
+
 
 def filter_predictions(predictions, entropies=None):
     out = []
@@ -134,7 +87,9 @@ def filter_predictions(predictions, entropies=None):
         out.append(' '.join(words_filtered))
     return out
     
-def search(phrase, top_p, top_k, timeout, temperature, length, batch_size=1, enc=tokenizer, model=model,):
+def search(phrase, top_p, top_k, timeout, temperature, length, batch_size=1, enc=tokenizer, model=model, logger=None):
+    if logger is not None:
+        logger.debug('search')
     stop_token = [enc.encoder[x] for x in ('<|endoftext|>', '.', '?', '!')]
     context_tokens = enc.encode(phrase) if phrase else [enc.encoder['<|endoftext|>']]
     context = torch.tensor(context_tokens, device=device, dtype=torch.long).unsqueeze(0).repeat(batch_size, 1)
@@ -145,9 +100,13 @@ def search(phrase, top_p, top_k, timeout, temperature, length, batch_size=1, enc
     entropies = []
     start_time = time.time()
     count = 0
+    times = []
     with torch.no_grad():
         while time.time() < start_time + timeout and count <= length:
+            st = time.time()
             logits, past = model(prev, past=past)
+            times.append(time.time() - st)
+            
             logits = logits[:, -1, :] / temperature
             probs_full = F.softmax(logits, dim=-1)
 #            entropy = torch.distributions.Categorical(probs=probs_full).entropy()
@@ -162,5 +121,6 @@ def search(phrase, top_p, top_k, timeout, temperature, length, batch_size=1, enc
     return {
         'completion': out[0],
         'all_completions': out,
+        'times': times,
 #        'entropies': {np.vstack(entropies)}
     }
