@@ -39,6 +39,9 @@ const useStyles = makeStyles(theme => ({
   button: {
     background: 'lightBlue', 
   },
+  papal: {
+	width:400,
+  }
 
 }));
 
@@ -46,7 +49,6 @@ class PromptAndResponse extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      classes: props.classes,
       value: "",
       size: "1.5B",
       search: "Beam",
@@ -107,9 +109,9 @@ class PromptAndResponse extends React.Component {
 
   render() {
     return (
-      <Grid container direction="column" justify="center" alignItems="center" spacing={2}>
-        <Grid item>
-          <FiddleGroup 
+	  <Grid container direction="column" spacing={4}>
+		<Grid item>
+		  <FiddleGroup 
 			hcsearch={this.handleSearchChange}
 			hcsize={this.handleSizeChange}
 			topk={this.handleTopkChange}
@@ -117,22 +119,13 @@ class PromptAndResponse extends React.Component {
 			temperature={this.handleTemperatureChange}
 			timeout={this.handleTimeoutChange}
 			/>
-        </Grid>
-        <Grid item className={this.state.classes.textField}>
-	      <Paper>
+		</Grid>
+		<Grid item>
+		  <Paper>
 			<MyEditor getConfig={this.getConfig} />
 		  </Paper>
-        </Grid>
-        <Grid item>
-        </Grid>
-        <Grid item>
-          <Paper>
-            <Typography variant="subtitle1" className={ this.state.classes.text }>
-              { this.state.value }
-            </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
+		</Grid>
+	  </Grid>
     );
   }
 }
@@ -140,7 +133,7 @@ class PromptAndResponse extends React.Component {
 function App() {
   const classes = useStyles();
   return (
-	<Grid container direction="column" alignItems="center" spacing={2}>
+	<Grid container direction="column" alignItems="center" spacing={4}>
 	  <Grid item>
 		<Typography variant="h3" className={classes.title}>
 		  Transformer Playground

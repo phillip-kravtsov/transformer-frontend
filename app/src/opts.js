@@ -16,11 +16,12 @@ const useStyles = makeStyles(theme => ({
   },
   formControl: {
     color: 'lightBlue',
+    height: '100px',
     margin: theme.spacing(3),
   },
   sliders: {
     flexGrow: 1,
-    width: 60,
+    width: 150,
   },
   button: {
     background: 'lightBlue', 
@@ -40,16 +41,12 @@ function Fiddle(props) {
       buttons.push(<div key={index}> <FormControlLabel value={value} key={index} control={<Radio />} label={value}/> </div>)
     }
     return (
-      <Grid container direction="row" justify="center" spacing={2}>
-        <Grid item>
-          <FormControl component="fieldset" className={classes.formControl}>
-          <FormLabel component="legend">{props.label}</FormLabel>
-          <RadioGroup aria-label={props.label} name="search1" value={value} onChange={handleChange}>
-            <div> {buttons} </div>
-          </RadioGroup>
-		  </FormControl>
-        </Grid>
-      </Grid>
+      <FormControl component="fieldset" className={classes.formControl}>
+      <FormLabel component="legend">{props.label}</FormLabel>
+      <RadioGroup aria-label={props.label} name="search1" value={value} onChange={handleChange}>
+        <div> {buttons} </div>
+      </RadioGroup>
+      </FormControl>
   );
 }
 
@@ -77,12 +74,14 @@ export default function FiddleGroup(props) {
   const classes = useStyles();
   return (
     <Grid container item direction="row" spacing={2}>
+      {/*
       <Grid item>
         <Fiddle handleChange={props.hcsearch} options={['Beam Search', 'Random Sampling']} label='Search Method'/>
       </Grid>
       <Grid item>
         <Fiddle handleChange={props.hcsize} options={['1.5B', '774M', '345M' ]} label='Model Size'/>
       </Grid>
+      */}
       <Grid container item direction="column" spacing={2}>
         <Grid container item direction="row" spacing={4}>
           <Grid item className={classes.sliders}>
