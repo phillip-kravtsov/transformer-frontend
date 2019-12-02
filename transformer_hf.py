@@ -13,10 +13,10 @@ def inference(phrase, top_k, top_p, length):
 '''
 
 # Load pre-trained model tokenizer (vocabulary)
-tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+tokenizer = GPT2Tokenizer.from_pretrained('gpt2-large')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = GPT2LMHeadModel.from_pretrained('gpt2')
+model = GPT2LMHeadModel.from_pretrained('gpt2-large')
 model.eval()
 model.half()
 model.to(device)
@@ -53,7 +53,8 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 def get_log_likelihood(phrase, context='', enc=tokenizer, model=model, logger=None):
-    assert len(phrase) > 0, 'nonempty phrase needed'
+    if not len(phrase):
+        return 1.0
     tokens = enc.encode(phrase) if phrase else [enc.encoder['<|endoftext|>']]
     len_phrase_tokens = len(tokens)
     context_tokens = enc.encode(context) if context else []
@@ -68,7 +69,10 @@ def get_log_likelihood(phrase, context='', enc=tokenizer, model=model, logger=No
     with torch.no_grad():
         logits, past = model(prev, past=None)
         probs_full = F.softmax(logits, dim=-1)
-        for i in range(len(context_tokens) + 1, len_phrase_tokens):
+        logger.warning(len(context_tokens))
+        logger.warning(len(tokens))
+        for i in range(len(context_tokens), len(tokens)):
+            logger.warning('uwu')
             prob_of_next_token = probs_full[0, i, tokens[i]]
             log_likelihood += np.log(prob_of_next_token.item())
     return log_likelihood
