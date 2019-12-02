@@ -67,7 +67,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
         logits[indices_to_remove] = filter_value
     return logits
 
-def inference(model = model, enc = tokenizer, phrase= '', top_k = 1, top_p = 0.9, length = 1):
+def inference(model = model, enc = tokenizer, phrase= '', top_k = 1, top_p = 0.9, length = 1, batch_size=1):
     nsamples = 1
     length = length
     temperature = 1.2
@@ -122,9 +122,19 @@ def sample_sequence(model, length, start_token=None, batch_size=None, context=No
                 break
     return output
 
-def search(phrase, top_p, top_k, timeout, temperature, length, enc=tokenizer, model=model):
- 
-    batch_size = 1
+def filter_predictions(predictions, entropies=None):
+    out = []
+    for pred in predictions:
+        words = pred.split(' ')
+        words_filtered = []
+        for word in words:
+            if '!' in word or '?' in word or '<|endoftext|>' in word:
+                break
+            words_filtered.append(word)
+        out.append(' '.join(words_filtered))
+    return out
+    
+def search(phrase, top_p, top_k, timeout, temperature, length, batch_size=1, enc=tokenizer, model=model,):
     stop_token = [enc.encoder[x] for x in ('<|endoftext|>', '.', '?', '!')]
     context_tokens = enc.encode(phrase) if phrase else [enc.encoder['<|endoftext|>']]
     context = torch.tensor(context_tokens, device=device, dtype=torch.long).unsqueeze(0).repeat(batch_size, 1)
@@ -140,16 +150,17 @@ def search(phrase, top_p, top_k, timeout, temperature, length, enc=tokenizer, mo
             logits, past = model(prev, past=past)
             logits = logits[:, -1, :] / temperature
             probs_full = F.softmax(logits, dim=-1)
-            entropy = torch.distributions.Categorical(probs=probs_full).entropy()
-            entropies.append(entropy.item())
+#            entropy = torch.distributions.Categorical(probs=probs_full).entropy()
+#            entropies.append(entropy.numpy())
             logits = top_k_top_p_filtering(logits, top_p=top_p, top_k=top_k)
             probs = F.softmax(logits, dim=-1)
             prev = torch.multinomial(probs, num_samples=1)
             output = torch.cat((output, prev), dim=1)
-            if prev in stop_token:
-                break
             count += 1
     out = output[:, len(context_tokens):].tolist()
+    out = filter_predictions([enc.decode(out[i]) for i in range(batch_size)])
     return {
-        'completion': enc.decode(out[0])
+        'completion': out[0],
+        'all_completions': out,
+#        'entropies': {np.vstack(entropies)}
     }
