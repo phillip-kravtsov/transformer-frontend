@@ -16,11 +16,12 @@ const useStyles = makeStyles(theme => ({
   },
   formControl: {
     color: 'lightBlue',
+    height: '100px',
     margin: theme.spacing(3),
   },
   sliders: {
     flexGrow: 1,
-    width: 300,
+    width: 150,
   },
   button: {
     background: 'lightBlue', 
@@ -40,21 +41,17 @@ function Fiddle(props) {
       buttons.push(<div key={index}> <FormControlLabel value={value} key={index} control={<Radio />} label={value}/> </div>)
     }
     return (
-      <Grid container direction="row" justify="center" spacing={2}>
-        <Grid item>
-          <FormControl component="fieldset" className={classes.formControl}>
-          <FormLabel component="legend">{props.label}</FormLabel>
-          <RadioGroup aria-label={props.label} name="search1" value={value} onChange={handleChange}>
-            <div> {buttons} </div>
-          </RadioGroup>
-		  </FormControl>
-        </Grid>
-      </Grid>
+      <FormControl component="fieldset" className={classes.formControl}>
+      <FormLabel component="legend">{props.label}</FormLabel>
+      <RadioGroup aria-label={props.label} name="search1" value={value} onChange={handleChange}>
+        <div> {buttons} </div>
+      </RadioGroup>
+      </FormControl>
   );
 }
 
 export default function FiddleGroup(props) {
-  const marks = [
+  const topkMarks = [
     {
       value: 1,
       label:'1'
@@ -64,30 +61,91 @@ export default function FiddleGroup(props) {
       label:'All'
     },
   ];
+  const toppMarks = [
+    {
+      value: 0.5,
+      label:'0.5'
+    },
+    {
+      value: 1.0,
+      label:'1.0'
+    },
+  ];
   const classes = useStyles();
   return (
     <Grid container item direction="row" spacing={2}>
+      {/*
       <Grid item>
         <Fiddle handleChange={props.hcsearch} options={['Beam Search', 'Random Sampling']} label='Search Method'/>
       </Grid>
       <Grid item>
         <Fiddle handleChange={props.hcsize} options={['1.5B', '774M', '345M' ]} label='Model Size'/>
       </Grid>
-	  <Grid item className={classes.sliders}>
-        <Typography id="top-k" gutterBottom>
-          Top K
-        </Typography>
-		<Slider
-		  defaultValue={10}
-		  aria-labelledby="top-k"
-		  valueLabelDisplay="auto"
-		  step={10}
-		  marks={marks}
-          min={1}
-          max={100} 
-          onChange={props.topk}
-        />
-	  </Grid>
+      */}
+      <Grid container item direction="column" spacing={2}>
+        <Grid container item direction="row" spacing={4}>
+          <Grid item className={classes.sliders}>
+            <Typography id="top-p" gutterBottom>
+              Top p
+            </Typography>
+            <Slider
+              defaultValue={1.0}
+              aria-labelledby="top-p"
+              valueLabelDisplay="auto"
+              step={0.001}
+              marks={toppMarks}
+              min={0.5}
+              max={1.0} 
+              onChange={props.topp}
+            />
+          </Grid>
+          <Grid item className={classes.sliders}>
+            <Typography fontSize={classes.sliders.fontSize} id="top-k" gutterBottom>
+              Top K
+            </Typography>
+            <Slider
+              defaultValue={10}
+              aria-labelledby="top-k"
+              valueLabelDisplay="auto"
+              step={1}
+              marks={topkMarks}
+              min={1}
+              max={100} 
+              onChange={props.topk}
+            />
+          </Grid>
+        </Grid>
+        <Grid container item direction="row" spacing={4}>
+          <Grid item className={classes.sliders}>
+            <Typography id="temperature" gutterBottom>
+              Temperature
+            </Typography>
+            <Slider
+              defaultValue={1.0}
+              aria-labelledby="temperature"
+              valueLabelDisplay="auto"
+              step={0.001}
+              min={0.2}
+              max={3.0} 
+              onChange={props.temperature}
+            />
+          </Grid>
+          <Grid item className={classes.sliders}>
+            <Typography fontSize={classes.sliders.fontSize} id="timeout" gutterBottom>
+              Timeout
+            </Typography>
+            <Slider
+              defaultValue={1.0}
+              aria-labelledby="timeout"
+              valueLabelDisplay="auto"
+              step={0.05}
+              min={0.1}
+              max={5.0} 
+              onChange={props.timeout}
+            />
+          </Grid>
+        </Grid>
+      </Grid>
     </Grid>
   );
 }

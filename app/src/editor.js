@@ -1,6 +1,8 @@
 import React from 'react';
+import {OrderedSet} from 'immutable';
 import now from 'performance-now';
-import {Editor, EditorState, getDefaultKeyBinding, Modifier} from 'draft-js';
+import {Editor, EditorState, getDefaultKeyBinding, Modifier, SelectionState} from 'draft-js';
+import Autosuggest from 'react-autosuggest';
 import './Draft.css'
 
 const styles = {
@@ -8,7 +10,7 @@ const styles = {
     minHeight: '12em',
 	padding: 10,
 	justify: 'center',
-	width: 400,
+	width: 600,
   }
 };
 
@@ -34,11 +36,16 @@ async function postData(url = '', data = {}) {
   return content;
 }
 
+function myBlockRenderer(contentBlock) {
+  const type = contentBlock.getType();
+}
 
 export default class myEditor extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {editorState:EditorState.createEmpty()};
+    this.state = {editorState:EditorState.createEmpty(),
+				  lastCompletionSelection: false,
+	};
     this.onChange = (editorState) => this.setState({editorState});
     this.setEditor = (editor) => {
       this.editor = editor;
@@ -52,18 +59,30 @@ export default class myEditor extends React.Component {
   };
  
   updateStateWithCompletion(completion, contentState) {
-	const currentSelection = this.state.editorState.getSelection();
-	const nextContentState = Modifier.insertText(contentState, currentSelection, completion); //Inline style?
-	const nextEditorState = EditorState.push(
+	const currSelection = this.state.editorState.getSelection();
+	if (!currSelection.isCollapsed()) return;
+	const nextContentState = Modifier.insertText(contentState,
+												 currSelection,
+												 completion,
+											     OrderedSet.of('BOLD'));
+	let nextEditorState = EditorState.push(
 		  this.state.editorState,
 		  nextContentState,
 		  'change-inline-style'
 	);
+	const nextSelection = nextEditorState.getSelection();
+	const currSelectionBlockKey = currSelection.getEndKey();
+	const completionSelectionEmpty = SelectionState.createEmpty(currSelectionBlockKey);
+	const completionSelectionWithAnchor = completionSelectionEmpty.set('anchorOffset', currSelection.getStartOffset())
+	const completionSelection = completionSelectionWithAnchor.set('focusOffset', nextSelection.getStartOffset());
+	nextEditorState = EditorState.forceSelection(nextEditorState, currSelection);
 	this.onChange(nextEditorState);
+	this.setState({'lastCompletionSelection': completionSelection});
   }
 
   async getCompletion(context) {
     var t0 = now();
+	console.log(this.props.getConfig());
     const data = {'context': context,
                   'config': this.props.getConfig(),
 	};
@@ -81,6 +100,25 @@ export default class myEditor extends React.Component {
 	if (command === 'complete') {
 	  // Do the thing here
 	  const contentState = this.state.editorState.getCurrentContent();
+	  if (!(this.state.lastCompletionSelection === false)) {
+		console.log("No falsehoods here");
+		console.log(this.state.lastCompletionSelection);
+		const endKey = this.state.lastCompletionSelection.getEndKey();
+		const emptySelection = SelectionState.createEmpty(endKey);
+		const offset = this.state.lastCompletionSelection.getEndOffset();
+		const endSelection = emptySelection.merge({
+		  focusKey: endKey,
+		  anchorOffset: offset,
+		  focusOffset: offset,
+		  hasFocus: true,
+		});
+		const ncs = Modifier.removeInlineStyle(contentState, this.state.lastCompletionSelection, 'BOLD');
+		var nextEditorState = EditorState.push(this.state.editorState, ncs, 'change-inline-style');
+		nextEditorState = EditorState.forceSelection(nextEditorState, endSelection);
+		this.onChange(nextEditorState);
+		this.setState({'lastCompletionSelection': false});
+		return;
+	  }
 	  const context = contentState.getPlainText('\n');
 	  console.log(context);
 	  const completion = await this.getCompletion(context);
@@ -94,11 +132,18 @@ export default class myEditor extends React.Component {
   componentDidMount() {
     this.focusEditor();
   };
+
+  styleMap = {
+	BOLD: {
+	  color: 'rgba(0, 0, 0, 0.5)',
+	},
+  }
   render() {
     return (
 	  <div style={styles.editor} onClick={this.focusEditor}>
 		<Editor placeholder="Enter something, and hit tab to get a neural network's predictions"
 				ref={this.setEditor}
+				customStyleMap={this.styleMap}
 				editorState={this.state.editorState}
 				handleKeyCommand={this.handleKeyCommand}
 				keyBindingFn={keyBindingFn}

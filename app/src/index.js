@@ -1,14 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import now from 'performance-now';
 import MyEditor from './editor.js';
 import FiddleGroup from './opts.js';
 import { makeStyles} from '@material-ui/core/styles';
 import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
 import Paper from '@material-ui/core/Paper';
-import TextField from '@material-ui/core/TextField';
-
 
 const useStyles = makeStyles(theme => ({
   container: {
@@ -42,44 +39,36 @@ const useStyles = makeStyles(theme => ({
   button: {
     background: 'lightBlue', 
   },
+  papal: {
+	width:400,
+  }
 
 }));
-
-async function postData(url = '', data = {}) {
-  const response = await fetch(url, {
-    method: 'POST',
-    cache: 'no-cache',
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-    },
-    body: JSON.stringify(data),
-    });
-  const content = await response.json();
-  return content;
-}
 
 class PromptAndResponse extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      classes: props.classes,
       value: "",
       size: "1.5B",
       search: "Beam",
-	  topk: '10',
+	  topk: 10,
+	  topp: 1.0,
+	  temperature: 1.0,
+	  timeout: 1.0,
     };
     // this.onClick = this.onClick.bind(this);
     this.handleChange = this.handleChange.bind(this);
     this.handleSizeChange = this.handleSizeChange.bind(this);
     this.handleSearchChange = this.handleSearchChange.bind(this);
 	this.handleTopkChange = this.handleTopkChange.bind(this);
+	this.handleToppChange = this.handleToppChange.bind(this);
+	this.handleTemperatureChange = this.handleTemperatureChange.bind(this);
+	this.handleTimeoutChange = this.handleTimeoutChange.bind(this);
 	this.getConfig = this.getConfig.bind(this);
   }
 
   handleChange(event) {
-    console.log(event.target.value);
     this.setState({value: event.target.value});
   };
   
@@ -91,95 +80,52 @@ class PromptAndResponse extends React.Component {
     this.setState({'search': event.target.value});
   };
 
+  handleToppChange(event, newValue) {
+	this.setState({'topp': newValue});
+  };
+
   handleTopkChange(event, newValue) {
-	console.log(newValue);
 	this.setState({'topk': newValue});
   };
 
-  /*
-  async onClick() {
-    
-    var t0 = now();
-    const data = {'context': this.state.value,
-                  'config': {
-                    'size': this.state.size,
-                    'search': this.state.search,
-                    'top_k': this.state.topk,
-                    'top_p': 0.9,
-                    'temperature': 1.2,
-                    'timeout': 2.0,
-                  }};
-    const resp = await postData('http://ec2-18-144-35-237.us-west-1.compute.amazonaws.com:4200/predict', data); //Calls postData above
-    //const resp = await postData('http://127.0.0.1:4200/predict', data);
-    const comp = resp['completion'];
-    var t1 = now();
-    console.log(t1-t0);
-    console.log(comp);
-    this.setState({'value': this.state.value.concat(comp)});
-    console.log(resp);
-  };*/
+  handleTemperatureChange(event, newValue) {
+	this.setState({'temperature': newValue});
+  };
+
+  handleTimeoutChange(event, newValue) {
+	this.setState({'timeout': newValue});
+  };
+
 
   getConfig() {
 	return {'size': this.state.size,
 			'search': this.state.search,
 			'top_k': this.state.topk,
-			'top_p': 1.0,
-			'temperature': 1.2,
-			'timeout': 0.8,
-			'length': 6,};
+			'top_p': this.state.topp,
+			'temperature': this.state.temperature,
+			'timeout': this.state.timeout,
+			'length': 10,};
     }
 
   render() {
     return (
-      <Grid container direction="column" justify="center" alignItems="center" spacing={2}>
-        <Grid item>
-          <FiddleGroup 
+	  <Grid container direction="column" spacing={4}>
+		<Grid item>
+		  <FiddleGroup 
 			hcsearch={this.handleSearchChange}
 			hcsize={this.handleSizeChange}
-			topk={this.handleTopkChange}/>
-        </Grid>
-        <Grid item className={this.state.classes.textField}>
-		  <MyEditor getConfig={this.getConfig} />
-        </Grid>
-        <Grid item>
-        </Grid>
-        <Grid item>
-          <Paper>
-            <Typography variant="subtitle1" className={ this.state.classes.text }>
-              { this.state.value }
-            </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
-    );
-  }
-}
-
-class Form extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      classes: props.classes,
-    }
-  }
-  render() {
-    return (
-      <form className={this.state.classes.textField} noValidate autoComplete="off">       
-        <div>
-          <TextField
-            id="prompt"
-            label="Prompt"
-            multiline
-            rowsMax="10"
-            value={this.state.value}
-            onChange={this.props.handleChange}
-            className={this.state.classes.textField}
-            fullWidth={true}
-            placeholder="Enter something, and hit GENERATE to get a neural network's predictions."
-            margin="dense"
-          />
-        </div>
-      </form>
+			topk={this.handleTopkChange}
+			topp={this.handleToppChange}
+			temperature={this.handleTemperatureChange}
+			timeout={this.handleTimeoutChange}
+			/>
+		</Grid>
+		<Grid item>
+		  <Paper>
+			<MyEditor getConfig={this.getConfig} />
+		  </Paper>
+		</Grid>
+	  </Grid>
     );
   }
 }
@@ -187,18 +133,16 @@ class Form extends React.Component {
 function App() {
   const classes = useStyles();
   return (
-    <Grid container direction="row" spacing={1}>
-      <Grid container item s={6} direction="column" alignItems="center" spacing={2}>
-        <Grid item>
-          <Typography variant="h3" className={classes.title}>
-            Transformer Playground
-          </Typography>
-        </Grid>
-        <Grid item>
-          <PromptAndResponse classes={classes} />
-        </Grid>
-      </Grid>
-    </Grid>
+	<Grid container direction="column" alignItems="center" spacing={4}>
+	  <Grid item>
+		<Typography variant="h3" className={classes.title}>
+		  Transformer Playground
+		</Typography>
+	  </Grid>
+	  <Grid item>
+		<PromptAndResponse classes={classes} />
+	  </Grid>
+	</Grid>
     );
 }
 
