@@ -22,6 +22,14 @@ def complete(context, config):
     app.logger.warning(sum(out_dict["times"])/len(out_dict['times']))
     return out_dict
 
+@app.route('/prob', methods=['POST', ])
+def prob():
+    data = request.get_json(force=True)
+    app.logger.debug(data)
+    likelihood = get_log_likelihood(data['phrase'], context=data['context'], logger=app.logger)
+    app.logger.warning(likelihood)
+    return {'log_likelihood': log_likelihood}
+
 @app.route('/predict', methods=['POST', ])
 def predict():
     data = request.get_json(force=True)
