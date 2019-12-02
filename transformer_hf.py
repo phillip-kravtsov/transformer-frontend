@@ -18,7 +18,7 @@ tokenizer = GPT2Tokenizer.from_pretrained('gpt2-large')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = GPT2LMHeadModel.from_pretrained('gpt2-large')
 model.eval()
-model.half()
+#model.half()
 model.to(device)
 
 def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
@@ -60,7 +60,6 @@ def get_log_likelihood(phrase, context='', enc=tokenizer, model=model, logger=No
     context_tokens = enc.encode(context) if context else []
     tokens.extend(context_tokens)
 
-    logger.warning(tokens)
     if len(tokens) > 1024:
         tokens = tokens[:-1024]
     prev = torch.tensor(tokens, device=device, dtype=torch.long).unsqueeze(0).repeat(1,1)
@@ -68,13 +67,11 @@ def get_log_likelihood(phrase, context='', enc=tokenizer, model=model, logger=No
     log_likelihood = 0.0
     with torch.no_grad():
         logits, past = model(prev, past=None)
-        probs_full = F.softmax(logits, dim=-1)
-        logger.warning(len(context_tokens))
-        logger.warning(len(tokens))
+        probs_full = F.softmax(logits, dim=-1, dtype=torch.float64)
+
         for i in range(len(context_tokens), len(tokens)):
-            logger.warning('uwu')
             prob_of_next_token = probs_full[0, i, tokens[i]]
-            log_likelihood += np.log(prob_of_next_token.item())
+            log_likelihood += np.log(prob_of_next_token.item() + 1e-50)
     return float(log_likelihood)
 
 def filter_predictions(predictions, entropies=None):
