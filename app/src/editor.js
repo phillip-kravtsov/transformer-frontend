@@ -18,6 +18,16 @@ const styles = {
 //const url = 'http://ec2-18-144-35-237.us-west-1.compute.amazonaws.com:4200/'
 const url = 'http://127.0.0.1:4200/'
 
+function keyBindingFn(e) {
+  if (e.key === 'Enter') {
+	return 'select';
+  }
+  if (e.key === 'Tab') {
+	return 'complete';
+  }
+  return getDefaultKeyBinding(e);
+}
+
 async function postData(url = '', data = {}) {
   const response = await fetch(url, {
     method: 'POST',
@@ -52,7 +62,6 @@ export default class myEditor extends React.Component {
     };
 	this.handleKeyCommand = this.handleKeyCommand.bind(this);
 	this.onChange = this.onChange.bind(this);
-	this.keyBindingFn = this.keyBindingFn.bind(this);
 	this.cleanLastSelection = this.cleanLastSelection.bind(this);
 	this.selectLastSelection = this.selectLastSelection.bind(this);
 	this.completionReady = this.completionReady.bind(this);
@@ -96,15 +105,6 @@ export default class myEditor extends React.Component {
 	this.setState({'log_likelihood': resp['log_likelihood']})
   }
 
-  keyBindingFn(e) {
-	if (e.key === 'Enter') {
-	  return 'select';
-	}
-	if (e.key === 'Tab') {
-	  return 'complete';
-	}
-	return getDefaultKeyBinding(e);
-  }
 
   cleanLastSelection(es) {
 	const currContent = es.getCurrentContent();
@@ -227,11 +227,24 @@ export default class myEditor extends React.Component {
   }
 
   async handleKeyCommand(command, editorState) {
-	console.log('kc', command, ' ', this.completionReady());
+	//console.log('kc', command, ' ', this.completionReady());
 	if (command === 'select' && this.completionReady()) {
 	  this.selectLastSelection(this.state.editorState);
 	  return 'handled';
 	} else {
+	  if (command === 'select') {
+		const newContentState = Modifier.insertText(
+				editorState.getCurrentContent(),
+				editorState.getSelection(),
+				"\n"
+		);
+		const nextEditorState = EditorState.push(
+		  editorState,
+		  newContentState,
+		  "insert-characters"
+		);
+		this.onChange(nextEditorState);
+	  }
 	  if (this.completionReady()) {
 		console.log('Clean in keycommand');
 		this.cleanLastSelection(editorState);
@@ -242,7 +255,6 @@ export default class myEditor extends React.Component {
 		console.log('Locked!');
 		return;
 	  }
-	  const contentState = editorState.getCurrentContent();
 	  const context = this.getSelectionText(editorState);
 	  console.log(context);
 	  if (this.completionReady()) {
@@ -277,7 +289,7 @@ export default class myEditor extends React.Component {
 				  customStyleMap={this.styleMap}
 				  editorState={this.state.editorState}
 				  handleKeyCommand={this.handleKeyCommand}
-				  keyBindingFn={this.keyBindingFn}
+				  keyBindingFn={keyBindingFn}
 				  onChange={this.onChange} />
 		</div>
 		<div>
