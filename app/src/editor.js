@@ -15,6 +15,8 @@ const styles = {
   }
 };
 
+//const url = 'http://ec2-18-144-35-237.us-west-1.compute.amazonaws.com:4200/'
+const url = 'http://127.0.0.1:4200/'
 
 async function postData(url = '', data = {}) {
   const response = await fetch(url, {
@@ -53,11 +55,16 @@ export default class myEditor extends React.Component {
 	this.keyBindingFn = this.keyBindingFn.bind(this);
 	this.cleanLastSelection = this.cleanLastSelection.bind(this);
 	this.selectLastSelection = this.selectLastSelection.bind(this);
+	this.completionReady = this.completionReady.bind(this);
 	this.onClick = this.onClick.bind(this);
   };
 
   onChange(editorState) {
 	this.setState({editorState});
+  }
+
+  completionReady() {
+	return this.state.lastCompletionSelection !== false;
   }
 
   async onClick() {
@@ -84,36 +91,31 @@ export default class myEditor extends React.Component {
 	  data = {'phrase': phrase, 'context': context}
 	}
 	console.log(data);
-    const resp = await postData('http://ec2-18-144-35-237.us-west-1.compute.amazonaws.com:4200/prob', data); //Calls postData above
+    const resp = await postData(url.concat('prob'), data); //Calls postData above
 	console.log(resp);
 	this.setState({'log_likelihood': resp['log_likelihood']})
   }
 
   keyBindingFn(e) {
-	if (e.key === 'Tab') {
-	  return 'complete'
+	if (e.key === 'Enter') {
+	  return 'select';
 	}
-	const inp = String.fromCharCode(e.keyCode);
-	if (/[a-zA-Z0-9-_ ]/.test(inp) || e.key === 'Enter' || e.keyCode === 8) {
-	  this.cleanLastSelection();	
-	  console.log('alphanumeric');
+	if (e.key === 'Tab') {
+	  return 'complete';
 	}
 	return getDefaultKeyBinding(e);
   }
 
-  cleanLastSelection() {
-	if (!(this.state.lastCompletionSelection === false)) {
-	  const currContent = this.state.editorState.getCurrentContent();
-	  const ncs = Modifier.replaceText(currContent, this.state.lastCompletionSelection, '');
-	  let nextEditorState = EditorState.push(
-		  this.state.editorState,
-		  ncs,
-		  'remove-range'
-	  );
-	  this.onChange(nextEditorState);
-	  this.setState({'lastCompletionSelection': false});
-	}
-
+  cleanLastSelection(es) {
+	const currContent = es.getCurrentContent();
+	const ncs = Modifier.replaceText(currContent, this.state.lastCompletionSelection, '');
+	let nextEditorState = EditorState.push(
+		es,
+		ncs,
+		'remove-range'
+	);
+	this.onChange(nextEditorState);
+	this.setState({'lastCompletionSelection': false});
   }
 
   selectLastSelection(editorState) {
@@ -128,7 +130,7 @@ export default class myEditor extends React.Component {
 	});
 	const cs = editorState.getCurrentContent();
 	console.log(this.state.lastCompletionSelection);
-	if (!(this.state.lastCompletionSelection === false)) {
+	if (this.completionReady()) {
 	  const ncs = Modifier.removeInlineStyle(cs, this.state.lastCompletionSelection, 'BOLD');
 	  let nextEditorState = EditorState.push(editorState, ncs, 'change-inline-style');
 	  nextEditorState = EditorState.forceSelection(nextEditorState, endSelection);
@@ -138,15 +140,16 @@ export default class myEditor extends React.Component {
 	return;
   }
  
-  updateStateWithCompletion(completion, contentState) {
-	const currSelection = this.state.editorState.getSelection();
+  updateStateWithCompletion(completion, editorState) {
+	const contentState = editorState.getCurrentContent();
+	const currSelection = editorState.getSelection();
 	if (!currSelection.isCollapsed()) return;
 	const nextContentState = Modifier.insertText(contentState,
 												 currSelection,
 												 completion,
 											     OrderedSet.of('BOLD'));
 	let nextEditorState = EditorState.push(
-		  this.state.editorState,
+		  editorState,
 		  nextContentState,
 		  'change-inline-style'
 	);
@@ -167,8 +170,7 @@ export default class myEditor extends React.Component {
                   'config': this.props.getConfig(),
 	};
 	console.log(data);
-    const resp = await postData('http://ec2-18-144-35-237.us-west-1.compute.amazonaws.com:4200/predict', data); //Calls postData above
-    //const resp = await postData('http://127.0.0.1:4200/predict', data);
+    const resp = await postData(url.concat('predict'), data); //Calls postData above
     const comp = resp['completion'];
 	console.log(resp['all_completions']);
     var t1 = now();
@@ -225,23 +227,33 @@ export default class myEditor extends React.Component {
   }
 
   async handleKeyCommand(command, editorState) {
+	console.log('kc', command, ' ', this.completionReady());
+	if (command === 'select' && this.completionReady()) {
+	  this.selectLastSelection(this.state.editorState);
+	  return 'handled';
+	} else {
+	  if (this.completionReady()) {
+		console.log('Clean in keycommand');
+		this.cleanLastSelection(editorState);
+	  }
+	}
 	if (command === 'complete') {
 	  if (this.state.await_lock === true) {
 		console.log('Locked!');
 		return;
 	  }
 	  const contentState = editorState.getCurrentContent();
-	  if (!(this.state.lastCompletionSelection === false)) {
-		this.selectLastSelection(editorState);
-		return;
-	  }
 	  const context = this.getSelectionText(editorState);
 	  console.log(context);
+	  if (this.completionReady()) {
+		console.log('Clean in keycommand');
+		this.cleanLastSelection(editorState);
+	  }
 	  this.setState({'await_lock': true});
 	  const completion = await this.getCompletion(context);
 	  this.setState({'await_lock': false});
 	  console.log(completion)
-	  this.updateStateWithCompletion(completion, contentState);
+	  this.updateStateWithCompletion(completion, this.state.editorState);
 	  return 'handled';
 	}
 	return 'not-handled';
