@@ -42,6 +42,7 @@ export default class myEditor extends React.Component {
     };
     this.lastCompletionSelection = false;
     this.await_lock = false;
+    this.completionsMap = new Map();
 
     this.setEditor = (editor) => {
       this.editor = editor;
@@ -56,7 +57,7 @@ export default class myEditor extends React.Component {
     this.maybeCleanLastSelection = this.maybeCleanLastSelection.bind(this);
     this.selectLastSelection = this.selectLastSelection.bind(this);
     this.completionReady = this.completionReady.bind(this);
-	this.keyBindingFn = this.keyBindingFn.bind(this);
+    this.keyBindingFn = this.keyBindingFn.bind(this);
     this.onClick = this.onClick.bind(this);
   };
 
@@ -65,7 +66,7 @@ export default class myEditor extends React.Component {
   }
 
   completionReady() {
-    return this.lastCompletionSelection !== false;
+    return !(this.lastCompletionSelection === false);
   }
 
   async onClick() {
@@ -107,13 +108,14 @@ export default class myEditor extends React.Component {
     }
     const inp = String.fromCharCode(e.keyCode);
     if (/[a-zA-Z0-9-_ ]/.test(inp) || e.key === 'Enter' || e.keyCode === 8) {
-	  this.maybeCleanLastSelection(this.state.editorState);
+      this.maybeCleanLastSelection(this.state.editorState);
       console.log('alphanumeric');
     }
     return getDefaultKeyBinding(e);
   }
   maybeCleanLastSelection(es) {
     if (this.completionReady()) {
+	  console.log('Clean');
       const currContent = es.getCurrentContent();
       const ncs = Modifier.replaceText(currContent, this.lastCompletionSelection, '');
       let nextEditorState = EditorState.push(
@@ -122,7 +124,8 @@ export default class myEditor extends React.Component {
           'remove-range'
       );
       this.onChange(nextEditorState);
-      this.lastCompletionState = false;
+      this.lastCompletionSelection = false;
+	  console.log('Should be false:', this.completionReady());
     } else {
       console.log('No clean');
     }
@@ -139,11 +142,11 @@ export default class myEditor extends React.Component {
       hasFocus: true,
     });
     console.log(this.lastCompletionSelection);
-	const cs = editorState.getCurrentContent();
-	const ncs = Modifier.removeInlineStyle(cs, this.lastCompletionSelection, 'BOLD');
-	let nextEditorState = EditorState.push(editorState, ncs, 'change-inline-style');
-	nextEditorState = EditorState.forceSelection(nextEditorState, endSelection);
-	this.onChange(nextEditorState);
+    const cs = editorState.getCurrentContent();
+    const ncs = Modifier.removeInlineStyle(cs, this.lastCompletionSelection, 'BOLD');
+    let nextEditorState = EditorState.push(editorState, ncs, 'change-inline-style');
+    nextEditorState = EditorState.forceSelection(nextEditorState, endSelection);
+    this.onChange(nextEditorState);
     this.lastCompletionSelection = false;
     return;
   }
@@ -173,14 +176,29 @@ export default class myEditor extends React.Component {
 
   async getCompletion(context) {
     var t0 = now();
+    if (this.completionsMap.has(context)) {
+      const completions = this.completionsMap.get(context);
+      if (completions.length === 0) {
+    	this.completionsMap.delete(context);         
+      } else {
+		return completions.pop();
+	  } 
+    }
+	if (this.await_lock === true) {
+	  console.log('Locked!');
+	  return '';
+	}
     console.log(this.props.getConfig());
     const data = {'context': context,
                   'config': this.props.getConfig(),
     };
     console.log(data);
+	this.await_lock = true;
     const resp = await postData(url.concat('predict'), data); //Calls postData above
-    const comp = resp['completion'];
-    console.log(resp['all_completions']);
+	this.await_lock = false;
+    const completions = resp['all_completions'];
+    const comp = completions[0];
+    this.completionsMap.set(context, completions.slice(1));
     var t1 = now();
     console.log(t1-t0);
     console.log(comp);
@@ -257,16 +275,13 @@ export default class myEditor extends React.Component {
       this.maybeCleanLastSelection(editorState);
     }
     if (command === 'complete') {
-      if (this.await_lock === true) {
-        console.log('Locked!');
-        return;
-      }
       const context = this.getSelectionText(editorState);
       console.log(context);
       this.maybeCleanLastSelection(editorState);
-      this.await_lock = true;
       const completion = await this.getCompletion(context);
-      this.await_lock = false;
+	  if (completion === '') {
+		return;
+	  }
       console.log(completion)
       this.updateStateWithCompletion(completion, this.state.editorState);
       return 'handled';
