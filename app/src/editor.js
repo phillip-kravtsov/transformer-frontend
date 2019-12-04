@@ -104,6 +104,9 @@ export default class myEditor extends React.Component {
       return 'select';
     }
     if (e.key === 'Tab') {
+	  if (e.shiftKey) {
+		return 'complete-back';
+	  }
       return 'complete';
     }
     const inp = String.fromCharCode(e.keyCode);
@@ -174,14 +177,28 @@ export default class myEditor extends React.Component {
     this.lastCompletionSelection = completionSelection;
   }
 
-  async getCompletion(context) {
+  async getCompletion(context, back=false) {
     var t0 = now();
     if (this.completionsMap.has(context)) {
-      const completions = this.completionsMap.get(context);
-      if (completions.length === 0) {
-    	this.completionsMap.delete(context);         
+      const pair = this.completionsMap.get(context);
+	  const idx = pair['idx']
+	  const completions = pair['completions']
+      if (idx !== completions.length) {
+		let next_idx;
+		if (!back) {
+		  next_idx = idx + 1;
+		} else {
+		  if (idx > 0) {
+			next_idx = idx - 1;
+		  } else {
+			next_idx = completions.length - 1;
+		  }
+		}
+		const completion = completions[next_idx]
+		this.completionsMap.set(context, {'idx': next_idx, 'completions': completions});
+		return completion;
       } else {
-		return completions.pop();
+    	this.completionsMap.delete(context);         
 	  } 
     }
 	if (this.await_lock === true) {
@@ -198,7 +215,7 @@ export default class myEditor extends React.Component {
 	this.await_lock = false;
     const completions = resp['all_completions'];
     const comp = completions[0];
-    this.completionsMap.set(context, completions.slice(1));
+    this.completionsMap.set(context, {'idx': 1, 'completions': completions});
     var t1 = now();
     console.log(t1-t0);
     console.log(comp);
@@ -221,9 +238,6 @@ export default class myEditor extends React.Component {
     }
     // Note: the code below only works if startKey and endKey are different, that is
     // if the selection spans across blocks. The other case is handled above.
-
-    console.log(startKey);
-    console.log(endKey);
 
     let context = "";
     let encounteredFirst = false;
@@ -274,11 +288,10 @@ export default class myEditor extends React.Component {
       console.log('Clean in keycommand');
       this.maybeCleanLastSelection(editorState);
     }
-    if (command === 'complete') {
+    if (command === 'complete' || command === 'complete-back') {
       const context = this.getSelectionText(editorState);
-      console.log(context);
       this.maybeCleanLastSelection(editorState);
-      const completion = await this.getCompletion(context);
+      const completion = await this.getCompletion(context, command === 'complete-back');
 	  if (completion === '') {
 		return;
 	  }
