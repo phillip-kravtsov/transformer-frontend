@@ -3,20 +3,12 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import numpy as np
 import torch.nn.functional as F
 import time
-'''
-Method
-def inference(phrase, top_k, top_p, length):
-    phrase - input string
-    top_k - integer of top k values from output logit
-    top_p - double of top p (probability) values from output logit
-    length = # of next words
-'''
 
 # Load pre-trained model tokenizer (vocabulary)
-tokenizer = GPT2Tokenizer.from_pretrained('gpt2-large')
+tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = GPT2LMHeadModel.from_pretrained('gpt2-large')
+model = GPT2LMHeadModel.from_pretrained('gpt2')
 model.eval()
 #model.half()
 model.to(device)
@@ -116,7 +108,8 @@ def search(phrase, top_p, top_k, timeout, temperature, length, batch_size=1, enc
             output = torch.cat((output, prev), dim=1)
             count += 1
     out = output[:, len(context_tokens):].tolist()
-    out = filter_predictions([enc.decode(out[i]) for i in range(batch_size)])
+    #out = filter_predictions([enc.decode(out[i]) for i in range(batch_size)])
+    out = [enc.decode(out[i]) for i in range(batch_size)]
     return {
         'completion': out[0],
         'all_completions': out,

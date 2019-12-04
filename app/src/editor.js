@@ -9,24 +9,15 @@ import './Draft.css'
 const styles = {
   editor: {
     minHeight: '12em',
-	padding: 10,
-	justify: 'center',
-	width: 600,
+    padding: 10,
+    justify: 'center',
+    width: 600,
   }
 };
 
 //const url = 'http://ec2-18-144-35-237.us-west-1.compute.amazonaws.com:4200/'
 const url = 'http://127.0.0.1:4200/'
 
-function keyBindingFn(e) {
-  if (e.key === 'Enter') {
-	return 'select';
-  }
-  if (e.key === 'Tab') {
-	return 'complete';
-  }
-  return getDefaultKeyBinding(e);
-}
 
 async function postData(url = '', data = {}) {
   const response = await fetch(url, {
@@ -46,11 +37,11 @@ async function postData(url = '', data = {}) {
 export default class myEditor extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {editorState:EditorState.createEmpty(),
-				  lastCompletionSelection: false,
-				  await_lock: false,
-				  log_likelihood: 0,
-	};
+    this.state = {editorState: EditorState.createEmpty(),
+                  log_likelihood: 0,
+    };
+    this.lastCompletionSelection = false;
+    this.await_lock = false;
 
     this.setEditor = (editor) => {
       this.editor = editor;
@@ -60,215 +51,227 @@ export default class myEditor extends React.Component {
         this.editor.focus();
       }
     };
-	this.handleKeyCommand = this.handleKeyCommand.bind(this);
-	this.onChange = this.onChange.bind(this);
-	this.cleanLastSelection = this.cleanLastSelection.bind(this);
-	this.selectLastSelection = this.selectLastSelection.bind(this);
-	this.completionReady = this.completionReady.bind(this);
-	this.onClick = this.onClick.bind(this);
+    this.handleKeyCommand = this.handleKeyCommand.bind(this);
+    this.onChange = this.onChange.bind(this);
+    this.maybeCleanLastSelection = this.maybeCleanLastSelection.bind(this);
+    this.selectLastSelection = this.selectLastSelection.bind(this);
+    this.completionReady = this.completionReady.bind(this);
+	this.keyBindingFn = this.keyBindingFn.bind(this);
+    this.onClick = this.onClick.bind(this);
   };
 
   onChange(editorState) {
-	this.setState({editorState});
+    this.setState({'editorState': editorState});
   }
 
   completionReady() {
-	return this.state.lastCompletionSelection !== false;
+    return this.lastCompletionSelection !== false;
   }
 
   async onClick() {
-	const phrase = this.getSelectionText(this.state.editorState);
-	const currSelection = this.state.editorState.getSelection();
-	let data;
-	if (currSelection.isCollapsed()) {
-	   data = {'phrase': phrase, 'context': ''};
-	} else {
-	  const blockMap = this.state.editorState.getCurrentContent().getBlockMap();
-	  const endKey = currSelection.getStartKey();
-	  
-	  var context = ''
-	  for (let keyblock of blockMap) {
-		const key = keyblock[0];
-		const block = keyblock[1];
-		let text = block.getText();
-		if (key === endKey) {
-		  context = context.concat(text.substring(0, currSelection.getStartOffset()));
-		  break;
-		}
-		context = context.concat(text).concat('\n');
-	  }
-	  data = {'phrase': phrase, 'context': context}
-	}
-	console.log(data);
+    const phrase = this.getSelectionText(this.state.editorState);
+    const currSelection = this.state.editorState.getSelection();
+    let data;
+    if (currSelection.isCollapsed()) {
+       data = {'phrase': phrase, 'context': ''};
+    } else {
+      const blockMap = this.state.editorState.getCurrentContent().getBlockMap();
+      const endKey = currSelection.getStartKey();
+      
+      var context = ''
+      for (let keyblock of blockMap) {
+        const key = keyblock[0];
+        const block = keyblock[1];
+        let text = block.getText();
+        if (key === endKey) {
+          context = context.concat(text.substring(0, currSelection.getStartOffset()));
+          break;
+        }
+        context = context.concat(text).concat('\n');
+      }
+      data = {'phrase': phrase, 'context': context}
+    }
+    console.log(data);
     const resp = await postData(url.concat('prob'), data); //Calls postData above
-	console.log(resp);
-	this.setState({'log_likelihood': resp['log_likelihood']})
+    console.log(resp);
+    this.setState({'log_likelihood': resp['log_likelihood']})
   }
 
 
-  cleanLastSelection(es) {
-	const currContent = es.getCurrentContent();
-	const ncs = Modifier.replaceText(currContent, this.state.lastCompletionSelection, '');
-	let nextEditorState = EditorState.push(
-		es,
-		ncs,
-		'remove-range'
-	);
-	this.onChange(nextEditorState);
-	this.setState({'lastCompletionSelection': false});
+  keyBindingFn(e) {
+    if (e.key === 'Enter') {
+      return 'select';
+    }
+    if (e.key === 'Tab') {
+      return 'complete';
+    }
+    const inp = String.fromCharCode(e.keyCode);
+    if (/[a-zA-Z0-9-_ ]/.test(inp) || e.key === 'Enter' || e.keyCode === 8) {
+	  this.maybeCleanLastSelection(this.state.editorState);
+      console.log('alphanumeric');
+    }
+    return getDefaultKeyBinding(e);
+  }
+  maybeCleanLastSelection(es) {
+    if (this.completionReady()) {
+      const currContent = es.getCurrentContent();
+      const ncs = Modifier.replaceText(currContent, this.lastCompletionSelection, '');
+      let nextEditorState = EditorState.push(
+          es,
+          ncs,
+          'remove-range'
+      );
+      this.onChange(nextEditorState);
+      this.lastCompletionState = false;
+    } else {
+      console.log('No clean');
+    }
   }
 
   selectLastSelection(editorState) {
-	const endKey = this.state.lastCompletionSelection.getEndKey();
-	const emptySelection = SelectionState.createEmpty(endKey);
-	const offset = this.state.lastCompletionSelection.getEndOffset();
-	const endSelection = emptySelection.merge({
-	  focusKey: endKey,
-	  anchorOffset: offset,
-	  focusOffset: offset,
-	  hasFocus: true,
-	});
+    const endKey = this.lastCompletionSelection.getEndKey();
+    const emptySelection = SelectionState.createEmpty(endKey);
+    const offset = this.lastCompletionSelection.getEndOffset();
+    const endSelection = emptySelection.merge({
+      focusKey: endKey,
+      anchorOffset: offset,
+      focusOffset: offset,
+      hasFocus: true,
+    });
+    console.log(this.lastCompletionSelection);
 	const cs = editorState.getCurrentContent();
-	console.log(this.state.lastCompletionSelection);
-	if (this.completionReady()) {
-	  const ncs = Modifier.removeInlineStyle(cs, this.state.lastCompletionSelection, 'BOLD');
-	  let nextEditorState = EditorState.push(editorState, ncs, 'change-inline-style');
-	  nextEditorState = EditorState.forceSelection(nextEditorState, endSelection);
-	  this.onChange(nextEditorState);
-	}
-	this.setState({'lastCompletionSelection': false});
-	return;
+	const ncs = Modifier.removeInlineStyle(cs, this.lastCompletionSelection, 'BOLD');
+	let nextEditorState = EditorState.push(editorState, ncs, 'change-inline-style');
+	nextEditorState = EditorState.forceSelection(nextEditorState, endSelection);
+	this.onChange(nextEditorState);
+    this.lastCompletionSelection = false;
+    return;
   }
  
   updateStateWithCompletion(completion, editorState) {
-	const contentState = editorState.getCurrentContent();
-	const currSelection = editorState.getSelection();
-	if (!currSelection.isCollapsed()) return;
-	const nextContentState = Modifier.insertText(contentState,
-												 currSelection,
-												 completion,
-											     OrderedSet.of('BOLD'));
-	let nextEditorState = EditorState.push(
-		  editorState,
-		  nextContentState,
-		  'change-inline-style'
-	);
-	const nextSelection = nextEditorState.getSelection();
-	const currSelectionBlockKey = currSelection.getEndKey();
-	const completionSelectionEmpty = SelectionState.createEmpty(currSelectionBlockKey);
-	const completionSelectionWithAnchor = completionSelectionEmpty.set('anchorOffset', currSelection.getStartOffset())
-	const completionSelection = completionSelectionWithAnchor.set('focusOffset', nextSelection.getStartOffset());
-	nextEditorState = EditorState.forceSelection(nextEditorState, currSelection);
-	this.onChange(nextEditorState);
-	this.setState({'lastCompletionSelection': completionSelection});
+    const contentState = editorState.getCurrentContent();
+    const currSelection = editorState.getSelection();
+    if (!currSelection.isCollapsed()) return;
+    const nextContentState = Modifier.insertText(contentState,
+                                                 currSelection,
+                                                 completion,
+                                                 OrderedSet.of('BOLD'));
+    let nextEditorState = EditorState.push(
+          editorState,
+          nextContentState,
+          'change-inline-style'
+    );
+    const nextSelection = nextEditorState.getSelection();
+    const currSelectionBlockKey = currSelection.getEndKey();
+    const completionSelectionEmpty = SelectionState.createEmpty(currSelectionBlockKey);
+    const completionSelectionWithAnchor = completionSelectionEmpty.set('anchorOffset', currSelection.getStartOffset())
+    const completionSelection = completionSelectionWithAnchor.set('focusOffset', nextSelection.getStartOffset());
+    nextEditorState = EditorState.forceSelection(nextEditorState, currSelection);
+    this.onChange(nextEditorState);
+    this.lastCompletionSelection = completionSelection;
   }
 
   async getCompletion(context) {
     var t0 = now();
-	console.log(this.props.getConfig());
+    console.log(this.props.getConfig());
     const data = {'context': context,
                   'config': this.props.getConfig(),
-	};
-	console.log(data);
+    };
+    console.log(data);
     const resp = await postData(url.concat('predict'), data); //Calls postData above
     const comp = resp['completion'];
-	console.log(resp['all_completions']);
+    console.log(resp['all_completions']);
     var t1 = now();
     console.log(t1-t0);
     console.log(comp);
-	return comp;
-  }	
+    return comp;
+  }    
   
   getSelectionText(editorState) {
-	const contentState = editorState.getCurrentContent();
-	const selection = editorState.getSelection();
-	var startKey;
-	if (selection.isCollapsed()) {
-	  startKey = contentState.getFirstBlock().getKey();
-	} else {
-	  startKey = selection.getStartKey();
-	}
-	const endKey = selection.getEndKey();
-	if (startKey === endKey && !selection.isCollapsed()) {
-	  const block = contentState.getBlockForKey(startKey);
-	  return block.getText().substring(selection.getStartOffset(), selection.getEndOffset());
-	}
-	// Note: the code below only works if startKey and endKey are different, that is
-	// if the selection spans across blocks. The other case is handled above.
+    const contentState = editorState.getCurrentContent();
+    const selection = editorState.getSelection();
+    var startKey;
+    if (selection.isCollapsed()) {
+      startKey = contentState.getFirstBlock().getKey();
+    } else {
+      startKey = selection.getStartKey();
+    }
+    const endKey = selection.getEndKey();
+    if (startKey === endKey && !selection.isCollapsed()) {
+      const block = contentState.getBlockForKey(startKey);
+      return block.getText().substring(selection.getStartOffset(), selection.getEndOffset());
+    }
+    // Note: the code below only works if startKey and endKey are different, that is
+    // if the selection spans across blocks. The other case is handled above.
 
-	console.log(startKey);
-	console.log(endKey);
+    console.log(startKey);
+    console.log(endKey);
 
-	let context = "";
-	let encounteredFirst = false;
-	const blockMap = contentState.getBlockMap();
-	
-	for (let keyblock of blockMap) {
-	  const key = keyblock[0];
-	  const block = keyblock[1];
-	  let text = block.getText();
-	  if (!encounteredFirst) {
-		if (key === startKey) {
-		  encounteredFirst = true;
-		  if (!selection.isCollapsed()) {
-			text = text.substring(selection.getStartOffset())
-		  }
-		} else {
-		  continue;
-		}
-	  }
-	  if (key === endKey) {
-		context = context.concat(text.substring(0, selection.getEndOffset()));
-		break;
-	  }
-	  context = context.concat(text).concat('\n');
-	}
-	return context
+    let context = "";
+    let encounteredFirst = false;
+    const blockMap = contentState.getBlockMap();
+    
+    for (let keyblock of blockMap) {
+      const key = keyblock[0];
+      const block = keyblock[1];
+      let text = block.getText();
+      if (!encounteredFirst) {
+        if (key === startKey) {
+          encounteredFirst = true;
+          if (!selection.isCollapsed()) {
+            text = text.substring(selection.getStartOffset())
+          }
+        } else {
+          continue;
+        }
+      }
+      if (key === endKey) {
+        context = context.concat(text.substring(0, selection.getEndOffset()));
+        break;
+      }
+      context = context.concat(text).concat('\n');
+    }
+    return context
   }
 
   async handleKeyCommand(command, editorState) {
-	//console.log('kc', command, ' ', this.completionReady());
-	if (command === 'select' && this.completionReady()) {
-	  this.selectLastSelection(this.state.editorState);
-	  return 'handled';
-	} else {
-	  if (command === 'select') {
-		const newContentState = Modifier.insertText(
-				editorState.getCurrentContent(),
-				editorState.getSelection(),
-				"\n"
-		);
-		const nextEditorState = EditorState.push(
-		  editorState,
-		  newContentState,
-		  "insert-characters"
-		);
-		this.onChange(nextEditorState);
-	  }
-	  if (this.completionReady()) {
-		console.log('Clean in keycommand');
-		this.cleanLastSelection(editorState);
-	  }
-	}
-	if (command === 'complete') {
-	  if (this.state.await_lock === true) {
-		console.log('Locked!');
-		return;
-	  }
-	  const context = this.getSelectionText(editorState);
-	  console.log(context);
-	  if (this.completionReady()) {
-		console.log('Clean in keycommand');
-		this.cleanLastSelection(editorState);
-	  }
-	  this.setState({'await_lock': true});
-	  const completion = await this.getCompletion(context);
-	  this.setState({'await_lock': false});
-	  console.log(completion)
-	  this.updateStateWithCompletion(completion, this.state.editorState);
-	  return 'handled';
-	}
-	return 'not-handled';
+    //console.log('kc', command, ' ', this.completionReady());
+    if (command === 'select' && this.completionReady()) {
+      this.selectLastSelection(this.state.editorState);
+      return 'handled';
+    } else {
+      if (command === 'select') {
+        const newContentState = Modifier.insertText(
+                editorState.getCurrentContent(),
+                editorState.getSelection(),
+                "\n"
+        );
+        const nextEditorState = EditorState.push(
+          editorState,
+          newContentState,
+          "insert-characters"
+        );
+        this.onChange(nextEditorState);
+      }
+      console.log('Clean in keycommand');
+      this.maybeCleanLastSelection(editorState);
+    }
+    if (command === 'complete') {
+      if (this.await_lock === true) {
+        console.log('Locked!');
+        return;
+      }
+      const context = this.getSelectionText(editorState);
+      console.log(context);
+      this.maybeCleanLastSelection(editorState);
+      this.await_lock = true;
+      const completion = await this.getCompletion(context);
+      this.await_lock = false;
+      console.log(completion)
+      this.updateStateWithCompletion(completion, this.state.editorState);
+      return 'handled';
+    }
+    return 'not-handled';
   };
 
   componentDidMount() {
@@ -276,31 +279,31 @@ export default class myEditor extends React.Component {
   };
 
   styleMap = {
-	BOLD: {
-	  color: 'rgba(0, 0, 0, 0.5)',
-	},
+    BOLD: {
+      color: 'rgba(0, 0, 0, 0.5)',
+    },
   }
   render() {
     return (
-	  <div>
-		<div style={styles.editor} onClick={this.focusEditor}>
-		  <Editor placeholder="Enter something, and hit tab to get a neural network's predictions. Control the context by selecting a region."
-				  ref={this.setEditor}
-				  customStyleMap={this.styleMap}
-				  editorState={this.state.editorState}
-				  handleKeyCommand={this.handleKeyCommand}
-				  keyBindingFn={keyBindingFn}
-				  onChange={this.onChange} />
-		</div>
-		<div>
-		  <Button onClick={this.onClick}>
-			Probabilty 
-		  </Button>
-		  <Typography variant="h5">
-			{this.state.log_likelihood}
-		  </Typography>
-		</div>
-	  </div>
+      <div>
+        <div style={styles.editor} onClick={this.focusEditor}>
+          <Editor placeholder="Enter something, and hit tab to get a neural network's predictions. Control the context by selecting a region."
+                  ref={this.setEditor}
+                  customStyleMap={this.styleMap}
+                  editorState={this.state.editorState}
+                  handleKeyCommand={this.handleKeyCommand}
+                  keyBindingFn={this.keyBindingFn}
+                  onChange={this.onChange} />
+        </div>
+        <div>
+          <Button onClick={this.onClick}>
+            Probabilty 
+          </Button>
+          <Typography variant="h5">
+            {this.state.log_likelihood}
+          </Typography>
+        </div>
+      </div>
     );
   };
 }
