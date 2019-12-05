@@ -56,6 +56,8 @@ class PromptAndResponse extends React.Component {
 	  topp: 1.0,
 	  temperature: 1.0,
 	  timeout: 1.0,
+	  count: 1,
+	  length: 8,
     };
     // this.onClick = this.onClick.bind(this);
     this.handleChange = this.handleChange.bind(this);
@@ -64,6 +66,8 @@ class PromptAndResponse extends React.Component {
 	this.handleTopkChange = this.handleTopkChange.bind(this);
 	this.handleToppChange = this.handleToppChange.bind(this);
 	this.handleTemperatureChange = this.handleTemperatureChange.bind(this);
+	this.handleCountChange = this.handleCountChange.bind(this);
+	this.handleLengthChange = this.handleLengthChange.bind(this);
 	this.handleTimeoutChange = this.handleTimeoutChange.bind(this);
 	this.getConfig = this.getConfig.bind(this);
   }
@@ -76,9 +80,17 @@ class PromptAndResponse extends React.Component {
     this.setState({'size': event.target.value});
   };
 
+  handleLengthChange(event, newValue) {
+	this.setState({'length': newValue});	
+  };
+
   handleSearchChange(event) {
     this.setState({'search': event.target.value});
   };
+
+  handleCountChange(event, newValue) {
+	this.setState({'count': newValue});
+  }
 
   handleToppChange(event, newValue) {
 	this.setState({'topp': newValue});
@@ -104,7 +116,8 @@ class PromptAndResponse extends React.Component {
 			'top_p': this.state.topp,
 			'temperature': this.state.temperature,
 			'timeout': this.state.timeout,
-			'length': 100,};
+			'count': this.state.count,
+			'length': this.state.length,};
     }
 
   render() {
@@ -118,7 +131,14 @@ class PromptAndResponse extends React.Component {
 			topp={this.handleToppChange}
 			temperature={this.handleTemperatureChange}
 			timeout={this.handleTimeoutChange}
-			/>
+			count={this.handleCountChange}
+		    length={this.handleLengthChange}
+		  />
+		</Grid>
+		<Grid item>
+		  <Typography variant="subtitle2">	
+			Press Tab to get a new completion, Enter to select the completion, and Shift-Tab to get the last completion.
+		  </Typography>
 		</Grid>
 		<Grid item>
 		  <Paper>

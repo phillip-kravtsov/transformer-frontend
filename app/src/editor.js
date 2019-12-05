@@ -15,9 +15,8 @@ const styles = {
   }
 };
 
-//const url = 'http://ec2-18-144-35-237.us-west-1.compute.amazonaws.com:4200/'
-const url = 'http://127.0.0.1:4200/'
-
+const url = 'http://ec2-52-53-221-65.us-west-1.compute.amazonaws.com:4200/'
+// const url = 'http://127.0.0.1:4200/' 
 
 async function postData(url = '', data = {}) {
   const response = await fetch(url, {
@@ -118,7 +117,6 @@ export default class myEditor extends React.Component {
   }
   maybeCleanLastSelection(es) {
     if (this.completionReady()) {
-	  console.log('Clean');
       const currContent = es.getCurrentContent();
       const ncs = Modifier.replaceText(currContent, this.lastCompletionSelection, '');
       let nextEditorState = EditorState.push(
@@ -285,7 +283,6 @@ export default class myEditor extends React.Component {
         );
         this.onChange(nextEditorState);
       }
-      console.log('Clean in keycommand');
       this.maybeCleanLastSelection(editorState);
     }
     if (command === 'complete' || command === 'complete-back') {

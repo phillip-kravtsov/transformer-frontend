@@ -58,7 +58,17 @@ export default function FiddleGroup(props) {
     },
     {
       value: 100,
-      label:'All'
+      label:'100'
+    },
+  ];
+  const lengthMarks = [
+    {
+      value: 1,
+      label:'1'
+    },
+    {
+      value: 32,
+      label:'32'
     },
   ];
   const toppMarks = [
@@ -69,6 +79,40 @@ export default function FiddleGroup(props) {
     {
       value: 1.0,
       label:'1.0'
+    },
+  ];
+  const tempMarks = [
+    {
+      value: 0.2,
+      label:'0.2'
+    },
+    {
+      value: 1.2,
+      label:'1.2'
+    },
+    {
+      value: 3.0,
+      label:'3.0'
+    },
+  ];
+  const countMarks = [
+    {
+      value: 1,
+      label:'1'
+    },
+    {
+      value: 8,
+      label:'8'
+    },
+  ];
+  const timeoutMarks = [
+    {
+      value: 0.1,
+      label:'0.1'
+    },
+    {
+      value: 5.0,
+      label:'5.0'
     },
   ];
   const classes = useStyles();
@@ -111,7 +155,22 @@ export default function FiddleGroup(props) {
               marks={topkMarks}
               min={1}
               max={100} 
-              onChange={props.topk}
+              onChange={props.length}
+            />
+          </Grid>
+          <Grid item className={classes.sliders}>
+            <Typography fontSize={classes.sliders.fontSize} id="length" gutterBottom>
+              Length
+            </Typography>
+            <Slider
+              defaultValue={8}
+              aria-labelledby="length"
+              valueLabelDisplay="auto"
+              step={1}
+              marks={lengthMarks}
+              min={1}
+              max={32} 
+              onChange={props.length}
             />
           </Grid>
         </Grid>
@@ -121,13 +180,29 @@ export default function FiddleGroup(props) {
               Temperature
             </Typography>
             <Slider
-              defaultValue={1.0}
+              defaultValue={1.2}
               aria-labelledby="temperature"
               valueLabelDisplay="auto"
               step={0.001}
               min={0.2}
               max={3.0} 
+              marks={tempMarks}
               onChange={props.temperature}
+            />
+          </Grid>
+          <Grid item className={classes.sliders}>
+            <Typography fontSize={classes.sliders.fontSize} id="count" gutterBottom>
+              Count
+            </Typography>
+            <Slider
+              defaultValue={1.0}
+              aria-labelledby="count"
+              valueLabelDisplay="auto"
+              step={1}
+              min={1}
+              max={8} 
+              marks={countMarks}
+              onChange={props.count}
             />
           </Grid>
           <Grid item className={classes.sliders}>
@@ -141,6 +216,7 @@ export default function FiddleGroup(props) {
               step={0.05}
               min={0.1}
               max={5.0} 
+              marks={timeoutMarks}
               onChange={props.timeout}
             />
           </Grid>
