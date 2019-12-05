@@ -1,11 +1,6 @@
 import React from 'react';
 import { makeStyles} from '@material-ui/core/styles';
-import FormControlLabel from '@material-ui/core/FormControlLabel';
-import FormControl from '@material-ui/core/FormControl';
-import FormLabel from '@material-ui/core/FormLabel';
 import Grid from '@material-ui/core/Grid';
-import Radio from '@material-ui/core/Radio';
-import RadioGroup from '@material-ui/core/RadioGroup';
 import Slider from '@material-ui/core/Slider';
 import Typography from '@material-ui/core/Typography';
 
@@ -28,27 +23,6 @@ const useStyles = makeStyles(theme => ({
   },
 
 }));
-function Fiddle(props) {
-    const classes = useStyles();
-    const [value, setValue] = React.useState(props.options[0]);
-    const handleChange = event => {
-      setValue(event.target.value);
-      props.handleChange(event);
-    };
-
-    const buttons = []
-    for (const [index, value] of props.options.entries()) {
-      buttons.push(<div key={index}> <FormControlLabel value={value} key={index} control={<Radio />} label={value}/> </div>)
-    }
-    return (
-      <FormControl component="fieldset" className={classes.formControl}>
-      <FormLabel component="legend">{props.label}</FormLabel>
-      <RadioGroup aria-label={props.label} name="search1" value={value} onChange={handleChange}>
-        <div> {buttons} </div>
-      </RadioGroup>
-      </FormControl>
-  );
-}
 
 export default function FiddleGroup(props) {
   const topkMarks = [
@@ -118,14 +92,6 @@ export default function FiddleGroup(props) {
   const classes = useStyles();
   return (
     <Grid container item direction="row" spacing={2}>
-      {/*
-      <Grid item>
-        <Fiddle handleChange={props.hcsearch} options={['Beam Search', 'Random Sampling']} label='Search Method'/>
-      </Grid>
-      <Grid item>
-        <Fiddle handleChange={props.hcsize} options={['1.5B', '774M', '345M' ]} label='Model Size'/>
-      </Grid>
-      */}
       <Grid container item direction="column" spacing={2}>
         <Grid container item direction="row" spacing={4}>
           <Grid item className={classes.sliders}>

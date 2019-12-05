@@ -50,8 +50,6 @@ class PromptAndResponse extends React.Component {
     super(props);
     this.state = {
       value: "",
-      size: "1.5B",
-      search: "Beam",
 	  topk: 10,
 	  topp: 1.0,
 	  temperature: 1.0,
@@ -61,8 +59,6 @@ class PromptAndResponse extends React.Component {
     };
     // this.onClick = this.onClick.bind(this);
     this.handleChange = this.handleChange.bind(this);
-    this.handleSizeChange = this.handleSizeChange.bind(this);
-    this.handleSearchChange = this.handleSearchChange.bind(this);
 	this.handleTopkChange = this.handleTopkChange.bind(this);
 	this.handleToppChange = this.handleToppChange.bind(this);
 	this.handleTemperatureChange = this.handleTemperatureChange.bind(this);
@@ -76,16 +72,8 @@ class PromptAndResponse extends React.Component {
     this.setState({value: event.target.value});
   };
   
-  handleSizeChange(event) {
-    this.setState({'size': event.target.value});
-  };
-
   handleLengthChange(event, newValue) {
 	this.setState({'length': newValue});	
-  };
-
-  handleSearchChange(event) {
-    this.setState({'search': event.target.value});
   };
 
   handleCountChange(event, newValue) {
@@ -125,8 +113,6 @@ class PromptAndResponse extends React.Component {
 	  <Grid container direction="column" spacing={4}>
 		<Grid item>
 		  <FiddleGroup 
-			hcsearch={this.handleSearchChange}
-			hcsize={this.handleSizeChange}
 			topk={this.handleTopkChange}
 			topp={this.handleToppChange}
 			temperature={this.handleTemperatureChange}
